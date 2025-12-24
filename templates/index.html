@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="th">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>OCR Accuracy Arena</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+  </head>
+  <body>
+    <main class="container">
+      <header class="header">
+        <h1>ระบบประเมินความแม่นยำ OCR</h1>
+        <p>
+          อัปโหลดภาพพร้อมกรอกค่าที่อยู่ในกรอบ Label (Production, Time, Expiry, Code)
+          ระบบจะตรวจว่าข้อความจาก OCR ตรงกับ Label หรือไม่
+        </p>
+      </header>
+
+      {% if error %}
+      <div class="alert">{{ error }}</div>
+      {% endif %}
+
+      <form class="form" method="post" enctype="multipart/form-data">
+        <div class="form-section">
+          <label class="file-upload">
+            <span>เลือกรูปภาพ</span>
+            <input type="file" name="image" accept="image/*" required />
+          </label>
+        </div>
+
+        <div class="grid">
+          <label>
+            Production
+            <input name="production" type="text" value="{{ labels.production }}" placeholder="เช่น 2024-06-01" />
+          </label>
+          <label>
+            Time
+            <input name="time" type="text" value="{{ labels.time }}" placeholder="เช่น 14:30" />
+          </label>
+          <label>
+            Expiry
+            <input name="expiry" type="text" value="{{ labels.expiry }}" placeholder="เช่น 2025-06-01" />
+          </label>
+          <label>
+            Code
+            <input name="code" type="text" value="{{ labels.code }}" placeholder="เช่น ABC12345" />
+          </label>
+        </div>
+
+        <button class="primary" type="submit">ประเมินผล</button>
+      </form>
+
+      {% if results %}
+      <section class="results">
+        <h2>ผลลัพธ์การประเมิน (เรียงจากความแม่นยำสูงสุด)</h2>
+        <table>
+          <thead>
+            <tr>
+              <th>โมเดล</th>
+              <th>ความแม่นยำ</th>
+              <th>Production</th>
+              <th>Time</th>
+              <th>Expiry</th>
+              <th>Code</th>
+              <th>สถานะ</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for result in results %}
+            <tr>
+              <td>{{ result.name }}</td>
+              <td>{{ (result.accuracy * 100) | round(1) }}%</td>
+              <td class="{{ 'ok' if result.matched.get('Production') else 'fail' }}">
+                {{ "ตรง" if result.matched.get('Production') else "ไม่ตรง" }}
+              </td>
+              <td class="{{ 'ok' if result.matched.get('Time') else 'fail' }}">
+                {{ "ตรง" if result.matched.get('Time') else "ไม่ตรง" }}
+              </td>
+              <td class="{{ 'ok' if result.matched.get('Expiry') else 'fail' }}">
+                {{ "ตรง" if result.matched.get('Expiry') else "ไม่ตรง" }}
+              </td>
+              <td class="{{ 'ok' if result.matched.get('Code') else 'fail' }}">
+                {{ "ตรง" if result.matched.get('Code') else "ไม่ตรง" }}
+              </td>
+              <td>
+                {% if result.available %}
+                  พร้อมใช้งาน
+                {% else %}
+                  {{ result.reason }}
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </section>
+      {% endif %}
+    </main>
+  </body>
+</html>
