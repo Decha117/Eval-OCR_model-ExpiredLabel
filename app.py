@@ -7,6 +7,7 @@ from typing import Iterable
 
 from flask import Flask, render_template, request
 from PIL import Image
+from werkzeug.utils import secure_filename
 
 from ocr_models import OCRModel, build_models, normalize_text
 
@@ -38,55 +39,59 @@ def create_app() -> Flask:
     @app.route("/", methods=["GET", "POST"])
     def index():
         results: list[dict] = []
+        per_image_results: list[dict] = []
         error: str | None = None
-        labels = LabelInput("", "", "", "")
+        entries: list[dict] = []
         if request.method == "POST":
-            labels = LabelInput(
-                production=request.form.get("production", "").strip(),
-                time=request.form.get("time", "").strip(),
-                expiry=request.form.get("expiry", "").strip(),
-                code=request.form.get("code", "").strip(),
-            )
+            entries = parse_entries(request)
 
-            file = request.files.get("image")
-            if not file or not file.filename:
-                error = "กรุณาอัปโหลดรูปภาพ"
+            if not entries:
+                error = "กรุณาอัปโหลดรูปภาพอย่างน้อย 1 รูป"
                 return render_template(
                     "index.html",
-                    labels=labels,
+                    entries=entries,
+                    per_image_results=per_image_results,
                     results=results,
                     error=error,
                 )
 
-            extension = Path(file.filename).suffix.lower()
-            if extension not in ALLOWED_EXTENSIONS:
-                error = "รองรับเฉพาะไฟล์ภาพ PNG, JPG, JPEG, BMP, TIFF"
-                return render_template(
-                    "index.html",
-                    labels=labels,
-                    results=results,
-                    error=error,
-                )
+            for entry in entries:
+                file = entry["file"]
+                extension = Path(file.filename).suffix.lower()
+                if extension not in ALLOWED_EXTENSIONS:
+                    error = "รองรับเฉพาะไฟล์ภาพ PNG, JPG, JPEG, BMP, TIFF"
+                    return render_template(
+                        "index.html",
+                        entries=entries,
+                        per_image_results=per_image_results,
+                        results=results,
+                        error=error,
+                    )
 
-            image_path = UPLOAD_DIR / f"upload{extension}"
-            file.save(image_path)
+                filename = secure_filename(file.filename) or f"upload_{entry['index']}{extension}"
+                image_path = UPLOAD_DIR / f"{entry['index']}_{filename}"
+                file.save(image_path)
 
-            try:
-                image = Image.open(image_path).convert("RGB")
-            except OSError:
-                error = "ไม่สามารถอ่านไฟล์ภาพได้"
-                return render_template(
-                    "index.html",
-                    labels=labels,
-                    results=results,
-                    error=error,
-                )
+                try:
+                    image = Image.open(image_path).convert("RGB")
+                except OSError:
+                    error = "ไม่สามารถอ่านไฟล์ภาพได้"
+                    return render_template(
+                        "index.html",
+                        entries=entries,
+                        per_image_results=per_image_results,
+                        results=results,
+                        error=error,
+                    )
 
-            results = evaluate_models(labels, image)
+                entry["image"] = image
+
+            results, per_image_results = evaluate_models(entries)
 
         return render_template(
             "index.html",
-            labels=labels,
+            entries=entries,
+            per_image_results=per_image_results,
             results=results,
             error=error,
         )
@@ -94,17 +99,51 @@ def create_app() -> Flask:
     return app
 
 
-def evaluate_models(labels: LabelInput, image: Image.Image) -> list[dict]:
-    label_values = labels.as_dict()
-    normalized_labels = {key: normalize_text(value) for key, value in label_values.items()}
+def evaluate_models(entries: list[dict]) -> tuple[list[dict], list[dict]]:
+    models = list(build_models())
+    per_image_results: list[dict] = []
+    overall: dict[str, dict] = {}
 
-    results: list[dict] = []
-    for model in build_models():
-        result = evaluate_model(model, normalized_labels, image)
-        results.append(result)
+    for model in models:
+        overall[model.name] = {
+            "name": model.name,
+            "available": model.error is None,
+            "accuracy": 0.0,
+            "correct": 0,
+            "total": 0,
+            "reason": model.error,
+        }
 
-    results.sort(key=lambda item: item["accuracy"], reverse=True)
-    return results
+    for entry in entries:
+        labels = entry["labels"]
+        normalized_labels = {key: normalize_text(value) for key, value in labels.items()}
+        image = entry["image"]
+        image_results: list[dict] = []
+
+        for model in models:
+            result = evaluate_model(model, normalized_labels, image)
+            image_results.append(result)
+            overall_result = overall[model.name]
+            overall_result["correct"] += result["correct"]
+            overall_result["total"] += result["total"]
+
+        per_image_results.append(
+            {
+                "filename": entry["filename"],
+                "labels": labels,
+                "results": sorted(image_results, key=lambda item: item["accuracy"], reverse=True),
+            }
+        )
+
+    overall_results: list[dict] = []
+    for model in models:
+        summary = overall[model.name]
+        total = summary["total"]
+        summary["accuracy"] = summary["correct"] / total if total else 0.0
+        overall_results.append(summary)
+
+    overall_results.sort(key=lambda item: item["accuracy"], reverse=True)
+    return overall_results, per_image_results
 
 
 def evaluate_model(
@@ -118,6 +157,8 @@ def evaluate_model(
             "available": False,
             "accuracy": 0.0,
             "matched": {},
+            "correct": 0,
+            "total": 0,
             "reason": model.error,
         }
 
@@ -126,9 +167,13 @@ def evaluate_model(
 
     matched: dict[str, bool] = {}
     correct = 0
-    total = len(labels)
+    total = 0
     for key, value in labels.items():
-        if value and value in normalized_text:
+        if not value:
+            matched[key] = False
+            continue
+        total += 1
+        if value in normalized_text:
             matched[key] = True
             correct += 1
         else:
@@ -140,8 +185,49 @@ def evaluate_model(
         "available": True,
         "accuracy": accuracy,
         "matched": matched,
+        "correct": correct,
+        "total": total,
         "reason": None,
     }
+
+
+def parse_entries(request) -> list[dict]:
+    indices: set[int] = set()
+    for key in request.files:
+        if key.startswith("image_"):
+            parts = key.split("_", 1)
+            if len(parts) == 2 and parts[1].isdigit():
+                indices.add(int(parts[1]))
+
+    for key in request.form:
+        for prefix in ("production_", "time_", "expiry_", "code_"):
+            if key.startswith(prefix):
+                parts = key.split("_", 1)
+                if len(parts) == 2 and parts[1].isdigit():
+                    indices.add(int(parts[1]))
+                break
+
+    entries: list[dict] = []
+    for index in sorted(indices):
+        file = request.files.get(f"image_{index}")
+        if not file or not file.filename:
+            continue
+        labels = LabelInput(
+            production=request.form.get(f"production_{index}", "").strip(),
+            time=request.form.get(f"time_{index}", "").strip(),
+            expiry=request.form.get(f"expiry_{index}", "").strip(),
+            code=request.form.get(f"code_{index}", "").strip(),
+        )
+        entries.append(
+            {
+                "index": index,
+                "filename": file.filename,
+                "file": file,
+                "labels": labels.as_dict(),
+            }
+        )
+
+    return entries
 
 
 def main() -> None:

@@ -21,30 +21,71 @@
       {% endif %}
 
       <form class="form" method="post" enctype="multipart/form-data">
-        <div class="form-section">
-          <label class="file-upload">
-            <span>เลือกรูปภาพ</span>
-            <input type="file" name="image" accept="image/*" required />
-          </label>
+        <div class="form-header">
+          <h2>รายการรูปภาพ</h2>
+          <button class="secondary" type="button" id="add-entry">เพิ่มรูปภาพ</button>
         </div>
 
-        <div class="grid">
-          <label>
-            Production
-            <input name="production" type="text" value="{{ labels.production }}" placeholder="เช่น 2024-06-01" />
-          </label>
-          <label>
-            Time
-            <input name="time" type="text" value="{{ labels.time }}" placeholder="เช่น 14:30" />
-          </label>
-          <label>
-            Expiry
-            <input name="expiry" type="text" value="{{ labels.expiry }}" placeholder="เช่น 2025-06-01" />
-          </label>
-          <label>
-            Code
-            <input name="code" type="text" value="{{ labels.code }}" placeholder="เช่น ABC12345" />
-          </label>
+        <div id="entries">
+          {% if entries %}
+            {% for entry in entries %}
+              <div class="entry-card" data-index="{{ entry.index }}">
+                <div class="entry-header">
+                  <strong>รูปที่ {{ loop.index }}</strong>
+                </div>
+                <label class="file-upload">
+                  <span>เลือกรูปภาพ</span>
+                  <input type="file" name="image_{{ entry.index }}" accept="image/*" />
+                </label>
+                <div class="grid">
+                  <label>
+                    Production
+                    <input name="production_{{ entry.index }}" type="text" value="{{ entry.labels.Production }}" />
+                  </label>
+                  <label>
+                    Time
+                    <input name="time_{{ entry.index }}" type="text" value="{{ entry.labels.Time }}" />
+                  </label>
+                  <label>
+                    Expiry
+                    <input name="expiry_{{ entry.index }}" type="text" value="{{ entry.labels.Expiry }}" />
+                  </label>
+                  <label>
+                    Code
+                    <input name="code_{{ entry.index }}" type="text" value="{{ entry.labels.Code }}" />
+                  </label>
+                </div>
+              </div>
+            {% endfor %}
+          {% else %}
+            <div class="entry-card" data-index="0">
+              <div class="entry-header">
+                <strong>รูปที่ 1</strong>
+              </div>
+              <label class="file-upload">
+                <span>เลือกรูปภาพ</span>
+                <input type="file" name="image_0" accept="image/*" required />
+              </label>
+              <div class="grid">
+                <label>
+                  Production
+                  <input name="production_0" type="text" placeholder="เช่น 2024-06-01" />
+                </label>
+                <label>
+                  Time
+                  <input name="time_0" type="text" placeholder="เช่น 14:30" />
+                </label>
+                <label>
+                  Expiry
+                  <input name="expiry_0" type="text" placeholder="เช่น 2025-06-01" />
+                </label>
+                <label>
+                  Code
+                  <input name="code_0" type="text" placeholder="เช่น ABC12345" />
+                </label>
+              </div>
+            </div>
+          {% endif %}
         </div>
 
         <button class="primary" type="submit">ประเมินผล</button>
@@ -52,16 +93,14 @@
 
       {% if results %}
       <section class="results">
-        <h2>ผลลัพธ์การประเมิน (เรียงจากความแม่นยำสูงสุด)</h2>
+        <h2>คะแนนรวมทุกภาพ (เรียงจากความแม่นยำสูงสุด)</h2>
         <table>
           <thead>
             <tr>
               <th>โมเดล</th>
               <th>ความแม่นยำ</th>
-              <th>Production</th>
-              <th>Time</th>
-              <th>Expiry</th>
-              <th>Code</th>
+              <th>คะแนน</th>
+              <th>รายละเอียด</th>
               <th>สถานะ</th>
             </tr>
           </thead>
@@ -70,18 +109,8 @@
             <tr>
               <td>{{ result.name }}</td>
               <td>{{ (result.accuracy * 100) | round(1) }}%</td>
-              <td class="{{ 'ok' if result.matched.get('Production') else 'fail' }}">
-                {{ "ตรง" if result.matched.get('Production') else "ไม่ตรง" }}
-              </td>
-              <td class="{{ 'ok' if result.matched.get('Time') else 'fail' }}">
-                {{ "ตรง" if result.matched.get('Time') else "ไม่ตรง" }}
-              </td>
-              <td class="{{ 'ok' if result.matched.get('Expiry') else 'fail' }}">
-                {{ "ตรง" if result.matched.get('Expiry') else "ไม่ตรง" }}
-              </td>
-              <td class="{{ 'ok' if result.matched.get('Code') else 'fail' }}">
-                {{ "ตรง" if result.matched.get('Code') else "ไม่ตรง" }}
-              </td>
+              <td>{{ result.correct }}/{{ result.total }}</td>
+              <td class="muted">ดูรายละเอียดในแต่ละภาพ</td>
               <td>
                 {% if result.available %}
                   พร้อมใช้งาน
@@ -95,6 +124,125 @@
         </table>
       </section>
       {% endif %}
+
+      {% if per_image_results %}
+      <section class="results">
+        <h2>คะแนนรายภาพ</h2>
+        {% for image in per_image_results %}
+          <div class="image-block">
+            <h3>{{ image.filename }}</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>โมเดล</th>
+                  <th>ความแม่นยำ</th>
+                  <th>Production</th>
+                  <th>Time</th>
+                  <th>Expiry</th>
+                  <th>Code</th>
+                  <th>สถานะ</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for result in image.results %}
+                <tr>
+                  <td>{{ result.name }}</td>
+                  <td>{{ (result.accuracy * 100) | round(1) }}%</td>
+                  {% if image.labels.Production %}
+                    <td class="{{ 'ok' if result.matched.get('Production') else 'fail' }}">
+                      {{ "ตรง" if result.matched.get('Production') else "ไม่ตรง" }}
+                    </td>
+                  {% else %}
+                    <td class="muted">ไม่ระบุ</td>
+                  {% endif %}
+                  {% if image.labels.Time %}
+                    <td class="{{ 'ok' if result.matched.get('Time') else 'fail' }}">
+                      {{ "ตรง" if result.matched.get('Time') else "ไม่ตรง" }}
+                    </td>
+                  {% else %}
+                    <td class="muted">ไม่ระบุ</td>
+                  {% endif %}
+                  {% if image.labels.Expiry %}
+                    <td class="{{ 'ok' if result.matched.get('Expiry') else 'fail' }}">
+                      {{ "ตรง" if result.matched.get('Expiry') else "ไม่ตรง" }}
+                    </td>
+                  {% else %}
+                    <td class="muted">ไม่ระบุ</td>
+                  {% endif %}
+                  {% if image.labels.Code %}
+                    <td class="{{ 'ok' if result.matched.get('Code') else 'fail' }}">
+                      {{ "ตรง" if result.matched.get('Code') else "ไม่ตรง" }}
+                    </td>
+                  {% else %}
+                    <td class="muted">ไม่ระบุ</td>
+                  {% endif %}
+                  <td>
+                    {% if result.available %}
+                      พร้อมใช้งาน
+                    {% else %}
+                      {{ result.reason }}
+                    {% endif %}
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% endfor %}
+      </section>
+      {% endif %}
     </main>
+
+    <template id="entry-template">
+      <div class="entry-card" data-index="__index__">
+        <div class="entry-header">
+          <strong>รูปที่ __number__</strong>
+        </div>
+        <label class="file-upload">
+          <span>เลือกรูปภาพ</span>
+          <input type="file" name="image___index__" accept="image/*" required />
+        </label>
+        <div class="grid">
+          <label>
+            Production
+            <input name="production___index__" type="text" placeholder="เช่น 2024-06-01" />
+          </label>
+          <label>
+            Time
+            <input name="time___index__" type="text" placeholder="เช่น 14:30" />
+          </label>
+          <label>
+            Expiry
+            <input name="expiry___index__" type="text" placeholder="เช่น 2025-06-01" />
+          </label>
+          <label>
+            Code
+            <input name="code___index__" type="text" placeholder="เช่น ABC12345" />
+          </label>
+        </div>
+      </div>
+    </template>
+
+    <script>
+      const addButton = document.getElementById("add-entry");
+      const entries = document.getElementById("entries");
+      const template = document.getElementById("entry-template").innerHTML.trim();
+
+      function nextIndex() {
+        const cards = entries.querySelectorAll(".entry-card");
+        return cards.length ? cards.length : 0;
+      }
+
+      addButton.addEventListener("click", () => {
+        const index = nextIndex();
+        const number = index + 1;
+        const html = template
+          .replaceAll("__index__", index)
+          .replaceAll("__number__", number);
+        const wrapper = document.createElement("div");
+        wrapper.innerHTML = html;
+        entries.appendChild(wrapper.firstElementChild);
+      });
+    </script>
   </body>
 </html>
