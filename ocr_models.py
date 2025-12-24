@@ -57,6 +57,8 @@ def rapidocr_predictor(image: Image.Image) -> list[str]:
 
     engine = RapidOCR()
     result, _ = engine(np.array(image))
+    if not result:
+        return []
     return [text for _, text, _ in result]
 
 
