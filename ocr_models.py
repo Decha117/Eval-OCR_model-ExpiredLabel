@@ -32,7 +32,8 @@ def preprocess_image(image: Image.Image) -> Image.Image:
     gray = cv2.cvtColor(np_image, cv2.COLOR_RGB2GRAY)
     clahe = cv2.createCLAHE(clipLimit=4.0, tileGridSize=(8, 8))
     enhanced = clahe.apply(gray)
-    return Image.fromarray(enhanced)
+    enhanced_rgb = cv2.cvtColor(enhanced, cv2.COLOR_GRAY2RGB)
+    return Image.fromarray(enhanced_rgb)
 
 
 def _is_relevant_text(text: str) -> bool:
