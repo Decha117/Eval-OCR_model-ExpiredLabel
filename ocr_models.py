@@ -36,10 +36,29 @@ def preprocess_image(image: Image.Image) -> Image.Image:
     return Image.fromarray(enhanced_rgb)
 
 
+DATE_PATTERN = re.compile(r"(?<!\d)(\d{2})[/-](\d{2})[/-](\d{2})(?!\d)")
+TIME_PATTERN = re.compile(r"(?<!\d)([01]\d|2[0-3]):[0-5]\d(?!\d)")
+CODE_PATTERN = re.compile(r"\b[A-Z]\s?\d{2}\b")
+
+
+def _has_comparison_date(text: str) -> bool:
+    if "<" not in text and ">" not in text:
+        return False
+    return bool(DATE_PATTERN.search(text))
+
+
 def _is_relevant_text(text: str) -> bool:
     lowered = text.lower()
     keywords = ("prod", "production", "exp", "expiry", "mfg", "mfd", "date", "ผลิต", "หมดอายุ")
     if any(keyword in lowered for keyword in keywords):
+        return True
+    if _has_comparison_date(text):
+        return True
+    if DATE_PATTERN.search(text):
+        return True
+    if TIME_PATTERN.search(text):
+        return True
+    if CODE_PATTERN.search(text):
         return True
     return bool(re.search(r"\d", text))
 
