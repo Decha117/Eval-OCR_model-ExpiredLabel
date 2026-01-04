@@ -38,7 +38,12 @@
     {% for image in per_image_results %}
       <div class="image-block">
         <h3>{{ image.filename }}</h3>
-        {% if image.image_url %}
+        {% if image.processed_image_url %}
+          <div class="image-preview">
+            <span class="muted">ภาพหลังการ preprocess + text detection</span>
+            <img src="{{ image.processed_image_url }}" alt="ภาพหลังประมวลผล {{ image.filename }}" />
+          </div>
+        {% elif image.image_url %}
           <div class="image-preview">
             <img src="{{ image.image_url }}" alt="ภาพที่ประเมิน {{ image.filename }}" />
           </div>

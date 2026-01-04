@@ -175,6 +175,11 @@ body {
   border: 1px solid #e2e8f0;
 }
 
+.image-preview .muted {
+  display: block;
+  margin-bottom: 8px;
+}
+
 .image-preview img {
   max-width: 100%;
   height: auto;

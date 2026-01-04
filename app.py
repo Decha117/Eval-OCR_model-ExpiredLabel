@@ -20,7 +20,7 @@ from flask import (
 from PIL import Image
 from werkzeug.utils import secure_filename
 
-from ocr_models import OCRModel, build_models, normalize_text
+from ocr_models import OCRModel, build_models, crop_text_regions, normalize_text, preprocess_image
 
 UPLOAD_DIR = Path("uploads")
 ALLOWED_EXTENSIONS = {".png", ".jpg", ".jpeg", ".bmp", ".tiff"}
@@ -209,6 +209,7 @@ def evaluate_models(entries: list[dict]) -> tuple[list[dict], list[dict]]:
         labels = entry["labels"]
         normalized_labels = {key: normalize_text(value) for key, value in labels.items()}
         image = entry["image"]
+        processed_image_url = save_processed_preview(image)
         image_results: list[dict] = []
 
         for model in models:
@@ -222,6 +223,7 @@ def evaluate_models(entries: list[dict]) -> tuple[list[dict], list[dict]]:
             {
                 "filename": entry["filename"],
                 "image_url": entry.get("image_url"),
+                "processed_image_url": processed_image_url,
                 "labels": labels,
                 "results": sorted(image_results, key=lambda item: item["accuracy"], reverse=True),
             }
@@ -286,6 +288,33 @@ def evaluate_model(
     }
 
 
+def build_processed_preview(image: Image.Image) -> Image.Image:
+    preprocessed = preprocess_image(image)
+    crops = crop_text_regions(preprocessed)
+    if not crops:
+        return preprocessed
+
+    padding = 12
+    widths = [crop.width for crop in crops]
+    heights = [crop.height for crop in crops]
+    total_height = sum(heights) + padding * (len(crops) + 1)
+    max_width = max(widths) + padding * 2
+    canvas = Image.new("RGB", (max_width, total_height), color=(255, 255, 255))
+    y_offset = padding
+    for crop in crops:
+        canvas.paste(crop, (padding, y_offset))
+        y_offset += crop.height + padding
+    return canvas
+
+
+def save_processed_preview(image: Image.Image) -> str:
+    processed = build_processed_preview(image)
+    filename = f"processed_{uuid.uuid4().hex}.jpg"
+    image_path = UPLOAD_DIR / filename
+    processed.save(image_path, format="JPEG", quality=90)
+    return f"/uploads/{image_path.name}"
+
+
 def run_job(job_id: str, entries: list[dict]) -> None:
     job = JOBS[job_id]
     job["logs"].append("เริ่มประมวลผลภาพทั้งหมด")
@@ -316,6 +345,8 @@ def run_job(job_id: str, entries: list[dict]) -> None:
             except OSError:
                 job["logs"].append(f"ไม่สามารถอ่านไฟล์ภาพ {entry['filename']}")
                 raise
+            job["logs"].append("เตรียมภาพ (preprocess + text detection)")
+            processed_image_url = save_processed_preview(image)
 
             image_results: list[dict] = []
             for model in models:
@@ -333,6 +364,7 @@ def run_job(job_id: str, entries: list[dict]) -> None:
                 {
                     "filename": entry["filename"],
                     "image_url": entry.get("image_url"),
+                    "processed_image_url": processed_image_url,
                     "labels": labels,
                     "results": sorted(image_results, key=lambda item: item["accuracy"], reverse=True),
                 }
