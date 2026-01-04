@@ -16,9 +16,6 @@ def normalize_text(text: str) -> str:
 
 def preprocess_image(image: Image.Image) -> Image.Image:
     np_image = np.array(image)
-    height = np_image.shape[0]
-    np_image = np_image[height // 2 :, :]
-
     center = (np_image.shape[1] / 2, np_image.shape[0] / 2)
     rotation = cv2.getRotationMatrix2D(center, -5, 1.0)
     np_image = cv2.warpAffine(
@@ -80,7 +77,10 @@ def crop_text_regions(image: Image.Image) -> list[Image.Image]:
     for page in export.get("pages", []):
         for block in page.get("blocks", []):
             for line in block.get("lines", []):
-                for word in line.get("words", []):
+                words = line.get("words", [])
+                line_text = " ".join(word.get("value", "") for word in words).strip()
+                line_is_relevant = bool(line_text) and _is_relevant_text(line_text)
+                for word in words:
                     geometry = word.get("geometry")
                     if not geometry:
                         continue
@@ -94,7 +94,7 @@ def crop_text_regions(image: Image.Image) -> list[Image.Image]:
                     box = (left, upper, right, lower)
                     all_boxes.append(box)
                     value = word.get("value", "")
-                    if value and _is_relevant_text(value):
+                    if line_is_relevant or (value and _is_relevant_text(value)):
                         relevant_boxes.append(box)
 
     boxes = relevant_boxes or all_boxes
