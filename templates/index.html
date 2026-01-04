@@ -37,6 +37,13 @@
                   <span>เลือกรูปภาพ</span>
                   <input type="file" name="image_{{ entry.index }}" accept="image/*" />
                 </label>
+                <div class="image-preview">
+                  {% if entry.image_url %}
+                    <img src="{{ entry.image_url }}" alt="ภาพที่อัปโหลด {{ entry.filename }}" />
+                  {% else %}
+                    <span class="muted">ยังไม่ได้อัปโหลดรูปภาพ</span>
+                  {% endif %}
+                </div>
                 <div class="grid">
                   <label>
                     Production
@@ -66,6 +73,9 @@
                 <span>เลือกรูปภาพ</span>
                 <input type="file" name="image_0" accept="image/*" required />
               </label>
+              <div class="image-preview">
+                <span class="muted">ยังไม่ได้อัปโหลดรูปภาพ</span>
+              </div>
               <div class="grid">
                 <label>
                   Production
@@ -131,6 +141,11 @@
         {% for image in per_image_results %}
           <div class="image-block">
             <h3>{{ image.filename }}</h3>
+            {% if image.image_url %}
+              <div class="image-preview">
+                <img src="{{ image.image_url }}" alt="ภาพที่ประเมิน {{ image.filename }}" />
+              </div>
+            {% endif %}
             <table>
               <thead>
                 <tr>
@@ -140,6 +155,7 @@
                   <th>Time</th>
                   <th>Expiry</th>
                   <th>Code</th>
+                  <th>Output</th>
                   <th>สถานะ</th>
                 </tr>
               </thead>
@@ -177,6 +193,13 @@
                     <td class="muted">ไม่ระบุ</td>
                   {% endif %}
                   <td>
+                    {% if result.output %}
+                      <pre class="ocr-output">{{ result.output }}</pre>
+                    {% else %}
+                      <span class="muted">ไม่มีผลลัพธ์</span>
+                    {% endif %}
+                  </td>
+                  <td>
                     {% if result.available %}
                       พร้อมใช้งาน
                     {% else %}
@@ -202,6 +225,9 @@
           <span>เลือกรูปภาพ</span>
           <input type="file" name="image___index__" accept="image/*" required />
         </label>
+        <div class="image-preview">
+          <span class="muted">ยังไม่ได้อัปโหลดรูปภาพ</span>
+        </div>
         <div class="grid">
           <label>
             Production
@@ -228,6 +254,28 @@
       const entries = document.getElementById("entries");
       const template = document.getElementById("entry-template").innerHTML.trim();
 
+      function attachPreview(card) {
+        const input = card.querySelector("input[type='file']");
+        const preview = card.querySelector(".image-preview");
+        if (!input || !preview) {
+          return;
+        }
+        input.addEventListener("change", () => {
+          if (!input.files || !input.files[0]) {
+            preview.innerHTML = '<span class="muted">ยังไม่ได้อัปโหลดรูปภาพ</span>';
+            return;
+          }
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            const src = event.target?.result;
+            if (typeof src === "string") {
+              preview.innerHTML = `<img src="${src}" alt="ภาพที่เลือก" />`;
+            }
+          };
+          reader.readAsDataURL(input.files[0]);
+        });
+      }
+
       function nextIndex() {
         const cards = entries.querySelectorAll(".entry-card");
         return cards.length ? cards.length : 0;
@@ -241,8 +289,12 @@
           .replaceAll("__number__", number);
         const wrapper = document.createElement("div");
         wrapper.innerHTML = html;
-        entries.appendChild(wrapper.firstElementChild);
+        const card = wrapper.firstElementChild;
+        entries.appendChild(card);
+        attachPreview(card);
       });
+
+      entries.querySelectorAll(".entry-card").forEach(attachPreview);
     </script>
   </body>
 </html>
