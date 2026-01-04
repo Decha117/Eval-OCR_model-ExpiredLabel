@@ -1,0 +1,113 @@
+{% if results %}
+  <section class="results">
+    <h2>คะแนนรวมทุกภาพ (เรียงจากความแม่นยำสูงสุด)</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>โมเดล</th>
+          <th>ความแม่นยำ</th>
+          <th>คะแนน</th>
+          <th>รายละเอียด</th>
+          <th>สถานะ</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for result in results %}
+        <tr>
+          <td>{{ result.name }}</td>
+          <td>{{ (result.accuracy * 100) | round(1) }}%</td>
+          <td>{{ result.correct }}/{{ result.total }}</td>
+          <td class="muted">ดูรายละเอียดในแต่ละภาพ</td>
+          <td>
+            {% if result.available %}
+              พร้อมใช้งาน
+            {% else %}
+              {{ result.reason }}
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+{% endif %}
+
+{% if per_image_results %}
+  <section class="results">
+    <h2>คะแนนรายภาพ</h2>
+    {% for image in per_image_results %}
+      <div class="image-block">
+        <h3>{{ image.filename }}</h3>
+        {% if image.image_url %}
+          <div class="image-preview">
+            <img src="{{ image.image_url }}" alt="ภาพที่ประเมิน {{ image.filename }}" />
+          </div>
+        {% endif %}
+        <table>
+          <thead>
+            <tr>
+              <th>โมเดล</th>
+              <th>ความแม่นยำ</th>
+              <th>Production</th>
+              <th>Time</th>
+              <th>Expiry</th>
+              <th>Code</th>
+              <th>Output</th>
+              <th>สถานะ</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for result in image.results %}
+            <tr>
+              <td>{{ result.name }}</td>
+              <td>{{ (result.accuracy * 100) | round(1) }}%</td>
+              {% if image.labels.Production %}
+                <td class="{{ 'ok' if result.matched.get('Production') else 'fail' }}">
+                  {{ "ตรง" if result.matched.get('Production') else "ไม่ตรง" }}
+                </td>
+              {% else %}
+                <td class="muted">ไม่ระบุ</td>
+              {% endif %}
+              {% if image.labels.Time %}
+                <td class="{{ 'ok' if result.matched.get('Time') else 'fail' }}">
+                  {{ "ตรง" if result.matched.get('Time') else "ไม่ตรง" }}
+                </td>
+              {% else %}
+                <td class="muted">ไม่ระบุ</td>
+              {% endif %}
+              {% if image.labels.Expiry %}
+                <td class="{{ 'ok' if result.matched.get('Expiry') else 'fail' }}">
+                  {{ "ตรง" if result.matched.get('Expiry') else "ไม่ตรง" }}
+                </td>
+              {% else %}
+                <td class="muted">ไม่ระบุ</td>
+              {% endif %}
+              {% if image.labels.Code %}
+                <td class="{{ 'ok' if result.matched.get('Code') else 'fail' }}">
+                  {{ "ตรง" if result.matched.get('Code') else "ไม่ตรง" }}
+                </td>
+              {% else %}
+                <td class="muted">ไม่ระบุ</td>
+              {% endif %}
+              <td>
+                {% if result.output %}
+                  <pre class="ocr-output">{{ result.output }}</pre>
+                {% else %}
+                  <span class="muted">ไม่มีผลลัพธ์</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if result.available %}
+                  พร้อมใช้งาน
+                {% else %}
+                  {{ result.reason }}
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% endfor %}
+  </section>
+{% endif %}

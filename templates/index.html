@@ -20,7 +20,7 @@
       <div class="alert">{{ error }}</div>
       {% endif %}
 
-      <form class="form" method="post" enctype="multipart/form-data">
+      <form class="form" id="ocr-form" method="post" enctype="multipart/form-data">
         <div class="form-header">
           <h2>รายการรูปภาพ</h2>
           <button class="secondary" type="button" id="add-entry">เพิ่มรูปภาพ</button>
@@ -37,6 +37,13 @@
                   <span>เลือกรูปภาพ</span>
                   <input type="file" name="image_{{ entry.index }}" accept="image/*" />
                 </label>
+                <div class="image-preview">
+                  {% if entry.image_url %}
+                    <img src="{{ entry.image_url }}" alt="ภาพที่อัปโหลด {{ entry.filename }}" />
+                  {% else %}
+                    <span class="muted">ยังไม่ได้อัปโหลดรูปภาพ</span>
+                  {% endif %}
+                </div>
                 <div class="grid">
                   <label>
                     Production
@@ -66,6 +73,9 @@
                 <span>เลือกรูปภาพ</span>
                 <input type="file" name="image_0" accept="image/*" required />
               </label>
+              <div class="image-preview">
+                <span class="muted">ยังไม่ได้อัปโหลดรูปภาพ</span>
+              </div>
               <div class="grid">
                 <label>
                   Production
@@ -91,106 +101,23 @@
         <button class="primary" type="submit">ประเมินผล</button>
       </form>
 
-      {% if results %}
-      <section class="results">
-        <h2>คะแนนรวมทุกภาพ (เรียงจากความแม่นยำสูงสุด)</h2>
-        <table>
-          <thead>
-            <tr>
-              <th>โมเดล</th>
-              <th>ความแม่นยำ</th>
-              <th>คะแนน</th>
-              <th>รายละเอียด</th>
-              <th>สถานะ</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for result in results %}
-            <tr>
-              <td>{{ result.name }}</td>
-              <td>{{ (result.accuracy * 100) | round(1) }}%</td>
-              <td>{{ result.correct }}/{{ result.total }}</td>
-              <td class="muted">ดูรายละเอียดในแต่ละภาพ</td>
-              <td>
-                {% if result.available %}
-                  พร้อมใช้งาน
-                {% else %}
-                  {{ result.reason }}
-                {% endif %}
-              </td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
+      <section class="progress-panel" id="progress-panel" hidden>
+        <h2>กำลังประมวลผล</h2>
+        <div class="progress-bar">
+          <div class="progress-bar-fill" id="progress-bar-fill"></div>
+        </div>
+        <div class="progress-meta">
+          <span id="progress-percent">0%</span>
+          <span id="progress-status" class="muted">รอเริ่มต้น</span>
+        </div>
+        <div class="progress-log">
+          <pre id="progress-log">ยังไม่มี log</pre>
+        </div>
       </section>
-      {% endif %}
 
-      {% if per_image_results %}
-      <section class="results">
-        <h2>คะแนนรายภาพ</h2>
-        {% for image in per_image_results %}
-          <div class="image-block">
-            <h3>{{ image.filename }}</h3>
-            <table>
-              <thead>
-                <tr>
-                  <th>โมเดล</th>
-                  <th>ความแม่นยำ</th>
-                  <th>Production</th>
-                  <th>Time</th>
-                  <th>Expiry</th>
-                  <th>Code</th>
-                  <th>สถานะ</th>
-                </tr>
-              </thead>
-              <tbody>
-                {% for result in image.results %}
-                <tr>
-                  <td>{{ result.name }}</td>
-                  <td>{{ (result.accuracy * 100) | round(1) }}%</td>
-                  {% if image.labels.Production %}
-                    <td class="{{ 'ok' if result.matched.get('Production') else 'fail' }}">
-                      {{ "ตรง" if result.matched.get('Production') else "ไม่ตรง" }}
-                    </td>
-                  {% else %}
-                    <td class="muted">ไม่ระบุ</td>
-                  {% endif %}
-                  {% if image.labels.Time %}
-                    <td class="{{ 'ok' if result.matched.get('Time') else 'fail' }}">
-                      {{ "ตรง" if result.matched.get('Time') else "ไม่ตรง" }}
-                    </td>
-                  {% else %}
-                    <td class="muted">ไม่ระบุ</td>
-                  {% endif %}
-                  {% if image.labels.Expiry %}
-                    <td class="{{ 'ok' if result.matched.get('Expiry') else 'fail' }}">
-                      {{ "ตรง" if result.matched.get('Expiry') else "ไม่ตรง" }}
-                    </td>
-                  {% else %}
-                    <td class="muted">ไม่ระบุ</td>
-                  {% endif %}
-                  {% if image.labels.Code %}
-                    <td class="{{ 'ok' if result.matched.get('Code') else 'fail' }}">
-                      {{ "ตรง" if result.matched.get('Code') else "ไม่ตรง" }}
-                    </td>
-                  {% else %}
-                    <td class="muted">ไม่ระบุ</td>
-                  {% endif %}
-                  <td>
-                    {% if result.available %}
-                      พร้อมใช้งาน
-                    {% else %}
-                      {{ result.reason }}
-                    {% endif %}
-                  </td>
-                </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-        {% endfor %}
-      </section>
-      {% endif %}
+      <div id="results-container">
+        {% include "results.html" %}
+      </div>
     </main>
 
     <template id="entry-template">
@@ -202,6 +129,9 @@
           <span>เลือกรูปภาพ</span>
           <input type="file" name="image___index__" accept="image/*" required />
         </label>
+        <div class="image-preview">
+          <span class="muted">ยังไม่ได้อัปโหลดรูปภาพ</span>
+        </div>
         <div class="grid">
           <label>
             Production
@@ -224,9 +154,38 @@
     </template>
 
     <script>
+      const form = document.getElementById("ocr-form");
       const addButton = document.getElementById("add-entry");
       const entries = document.getElementById("entries");
       const template = document.getElementById("entry-template").innerHTML.trim();
+      const progressPanel = document.getElementById("progress-panel");
+      const progressBarFill = document.getElementById("progress-bar-fill");
+      const progressPercent = document.getElementById("progress-percent");
+      const progressStatus = document.getElementById("progress-status");
+      const progressLog = document.getElementById("progress-log");
+      const resultsContainer = document.getElementById("results-container");
+
+      function attachPreview(card) {
+        const input = card.querySelector("input[type='file']");
+        const preview = card.querySelector(".image-preview");
+        if (!input || !preview) {
+          return;
+        }
+        input.addEventListener("change", () => {
+          if (!input.files || !input.files[0]) {
+            preview.innerHTML = '<span class="muted">ยังไม่ได้อัปโหลดรูปภาพ</span>';
+            return;
+          }
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            const src = event.target?.result;
+            if (typeof src === "string") {
+              preview.innerHTML = `<img src="${src}" alt="ภาพที่เลือก" />`;
+            }
+          };
+          reader.readAsDataURL(input.files[0]);
+        });
+      }
 
       function nextIndex() {
         const cards = entries.querySelectorAll(".entry-card");
@@ -241,7 +200,70 @@
           .replaceAll("__number__", number);
         const wrapper = document.createElement("div");
         wrapper.innerHTML = html;
-        entries.appendChild(wrapper.firstElementChild);
+        const card = wrapper.firstElementChild;
+        entries.appendChild(card);
+        attachPreview(card);
+      });
+
+      entries.querySelectorAll(".entry-card").forEach(attachPreview);
+
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        progressPanel.hidden = false;
+        progressBarFill.style.width = "0%";
+        progressPercent.textContent = "0%";
+        progressStatus.textContent = "เริ่มประมวลผล";
+        progressLog.textContent = "";
+        resultsContainer.innerHTML = "";
+
+        const submitButton = form.querySelector("button[type='submit']");
+        if (submitButton) {
+          submitButton.disabled = true;
+        }
+
+        const response = await fetch("/start", {
+          method: "POST",
+          body: new FormData(form),
+        });
+
+        const payload = await response.json();
+        if (!response.ok) {
+          progressStatus.textContent = payload.error || "เกิดข้อผิดพลาด";
+          if (submitButton) {
+            submitButton.disabled = false;
+          }
+          return;
+        }
+
+        const eventSource = new EventSource(`/progress/${payload.job_id}`);
+        eventSource.onmessage = async (message) => {
+          const data = JSON.parse(message.data);
+          if (data.logs && data.logs.length) {
+            const current = progressLog.textContent ? `${progressLog.textContent}\n` : "";
+            progressLog.textContent = `${current}${data.logs.join("\n")}`.trim();
+          }
+          if (typeof data.progress === "number") {
+            progressBarFill.style.width = `${data.progress}%`;
+            progressPercent.textContent = `${data.progress}%`;
+          }
+          if (data.error) {
+            progressStatus.textContent = data.error;
+          } else if (data.done) {
+            progressStatus.textContent = "เสร็จสิ้น";
+          }
+
+          if (data.done) {
+            eventSource.close();
+            const resultsResponse = await fetch(`/results/${payload.job_id}`);
+            const resultsPayload = await resultsResponse.json();
+            if (resultsPayload.html) {
+              resultsContainer.innerHTML = resultsPayload.html;
+            }
+            if (submitButton) {
+              submitButton.disabled = false;
+            }
+          }
+        };
       });
     </script>
   </body>
