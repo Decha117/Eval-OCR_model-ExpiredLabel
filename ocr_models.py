@@ -72,14 +72,11 @@ def crop_text_regions(image: Image.Image) -> list[Image.Image]:
 
     width, height = image.size
     all_boxes: list[tuple[int, int, int, int]] = []
-    relevant_boxes: list[tuple[int, int, int, int]] = []
 
     for page in export.get("pages", []):
         for block in page.get("blocks", []):
             for line in block.get("lines", []):
                 words = line.get("words", [])
-                line_text = " ".join(word.get("value", "") for word in words).strip()
-                line_is_relevant = bool(line_text) and _is_relevant_text(line_text)
                 for word in words:
                     geometry = word.get("geometry")
                     if not geometry:
@@ -93,15 +90,11 @@ def crop_text_regions(image: Image.Image) -> list[Image.Image]:
                         continue
                     box = (left, upper, right, lower)
                     all_boxes.append(box)
-                    value = word.get("value", "")
-                    if line_is_relevant or (value and _is_relevant_text(value)):
-                        relevant_boxes.append(box)
 
-    boxes = relevant_boxes or all_boxes
-    if not boxes:
+    if not all_boxes:
         return [image]
 
-    return [image.crop(box) for box in boxes]
+    return [image.crop(box) for box in all_boxes]
 
 
 @dataclass
