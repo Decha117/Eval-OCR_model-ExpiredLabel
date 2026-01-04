@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, send_from_directory, url_for
 from PIL import Image
 from werkzeug.utils import secure_filename
 
@@ -85,6 +85,7 @@ def create_app() -> Flask:
                     )
 
                 entry["image"] = image
+                entry["image_url"] = url_for("uploaded_file", filename=image_path.name)
 
             results, per_image_results = evaluate_models(entries)
 
@@ -95,6 +96,10 @@ def create_app() -> Flask:
             results=results,
             error=error,
         )
+
+    @app.route("/uploads/<path:filename>")
+    def uploaded_file(filename: str):
+        return send_from_directory(UPLOAD_DIR, filename)
 
     return app
 
@@ -130,6 +135,7 @@ def evaluate_models(entries: list[dict]) -> tuple[list[dict], list[dict]]:
         per_image_results.append(
             {
                 "filename": entry["filename"],
+                "image_url": entry.get("image_url"),
                 "labels": labels,
                 "results": sorted(image_results, key=lambda item: item["accuracy"], reverse=True),
             }
@@ -157,13 +163,15 @@ def evaluate_model(
             "available": False,
             "accuracy": 0.0,
             "matched": {},
+            "output": "",
             "correct": 0,
             "total": 0,
             "reason": model.error,
         }
 
     extracted_text = model.predict(image)
-    normalized_text = normalize_text(" ".join(extracted_text))
+    output_text = " ".join(extracted_text)
+    normalized_text = normalize_text(output_text)
 
     matched: dict[str, bool] = {}
     correct = 0
@@ -185,6 +193,7 @@ def evaluate_model(
         "available": True,
         "accuracy": accuracy,
         "matched": matched,
+        "output": output_text,
         "correct": correct,
         "total": total,
         "reason": None,

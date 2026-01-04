@@ -120,6 +120,29 @@ body {
   margin-top: 16px;
 }
 
+.image-preview {
+  margin: 12px 0 16px;
+  padding: 12px;
+  border-radius: 12px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+}
+
+.image-preview img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 10px;
+  display: block;
+}
+
+.ocr-output {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: "Segoe UI", sans-serif;
+  font-size: 13px;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;
