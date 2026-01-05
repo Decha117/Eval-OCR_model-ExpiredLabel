@@ -33,6 +33,37 @@ def preprocess_image(image: Image.Image) -> Image.Image:
     return Image.fromarray(enhanced_rgb)
 
 
+def preprocess_text_crop(image: Image.Image) -> Image.Image:
+    np_image = np.array(image)
+    height, width = np_image.shape[:2]
+    scale = 3 if max(height, width) < 100 else 2
+    np_image = cv2.resize(np_image, (width * scale, height * scale), interpolation=cv2.INTER_CUBIC)
+
+    gray = cv2.cvtColor(np_image, cv2.COLOR_RGB2GRAY)
+    clahe = cv2.createCLAHE(clipLimit=4.0, tileGridSize=(8, 8))
+    enhanced = clahe.apply(gray)
+
+    thresh = cv2.adaptiveThreshold(
+        enhanced,
+        255,
+        cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+        cv2.THRESH_BINARY,
+        31,
+        10,
+    )
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 2))
+    closed = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel, iterations=1)
+
+    sharpen_kernel = np.array([[0, -1, 0], [-1, 5, -1], [0, -1, 0]], dtype=np.float32)
+    sharpened = cv2.filter2D(closed, -1, sharpen_kernel)
+
+    blurred = cv2.GaussianBlur(enhanced, (3, 3), 0)
+    background_removed = cv2.subtract(enhanced, blurred)
+    cleaned = cv2.addWeighted(sharpened, 0.85, background_removed, 0.15, 0)
+    cleaned_rgb = cv2.cvtColor(cleaned, cv2.COLOR_GRAY2RGB)
+    return Image.fromarray(cleaned_rgb)
+
+
 DATE_PATTERN = re.compile(r"(?<!\d)(\d{2})[/-](\d{2})[/-](\d{2})(?!\d)")
 TIME_PATTERN = re.compile(r"(?<!\d)([01]\d|2[0-3]):[0-5]\d(?!\d)")
 CODE_PATTERN = re.compile(r"\b[A-Z]\s?\d{2}\b")
@@ -110,7 +141,8 @@ class OCRModel:
         crops = crop_text_regions(preprocessed)
         extracted: list[str] = []
         for crop in crops:
-            extracted.extend(self.predictor(crop))
+            processed_crop = preprocess_text_crop(crop)
+            extracted.extend(self.predictor(processed_crop))
         return extracted
 
 
