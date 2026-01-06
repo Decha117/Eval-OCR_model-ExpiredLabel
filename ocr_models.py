@@ -126,7 +126,6 @@ def paddleocr_predictor(
                 use_tensorrt=use_tensorrt,
                 precision=precision,
                 use_gpu=use_tensorrt,
-                show_log=False,
             )
         engine = _PADDLE_OCR_CACHE[key]
         result = engine.ocr(np.array(image), cls=True)
