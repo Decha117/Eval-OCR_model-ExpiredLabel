@@ -116,7 +116,43 @@ def _score_ocr_text(text: str) -> int:
 
 
 def crop_text_regions(image: Image.Image) -> list[Image.Image]:
-    return [image]
+    np_image = np.array(image)
+    gray = cv2.cvtColor(np_image, cv2.COLOR_RGB2GRAY)
+    blurred = cv2.GaussianBlur(gray, (3, 3), 0)
+    _, thresh = cv2.threshold(blurred, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    inverted = 255 - thresh
+
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (15, 3))
+    connected = cv2.morphologyEx(inverted, cv2.MORPH_CLOSE, kernel, iterations=2)
+    dilated = cv2.dilate(connected, kernel, iterations=1)
+
+    contours, _ = cv2.findContours(dilated, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    height, width = gray.shape[:2]
+    min_area = max(int(width * height * 0.005), 200)
+    crops: list[Image.Image] = []
+
+    for contour in contours:
+        x, y, w, h = cv2.boundingRect(contour)
+        if w * h < min_area:
+            continue
+        if w < 20 or h < 12:
+            continue
+        if w / max(h, 1) < 1.2:
+            continue
+        pad_x = int(w * 0.05)
+        pad_y = int(h * 0.2)
+        x0 = max(x - pad_x, 0)
+        y0 = max(y - pad_y, 0)
+        x1 = min(x + w + pad_x, width)
+        y1 = min(y + h + pad_y, height)
+        crop = image.crop((x0, y0, x1, y1))
+        crops.append(crop)
+
+    if not crops:
+        return [image]
+
+    crops.sort(key=lambda c: c.size[1], reverse=True)
+    return crops
 
 
 @dataclass
