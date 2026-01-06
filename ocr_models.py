@@ -42,26 +42,30 @@ def preprocess_text_crop(image: Image.Image) -> Image.Image:
     gray = cv2.cvtColor(np_image, cv2.COLOR_RGB2GRAY)
     clahe = cv2.createCLAHE(clipLimit=4.0, tileGridSize=(8, 8))
     enhanced = clahe.apply(gray)
+    sharpen_kernel = np.array([[0, -1, 0], [-1, 5, -1], [0, -1, 0]], dtype=np.float32)
+    sharpened = cv2.filter2D(enhanced, -1, sharpen_kernel)
+    softened = cv2.GaussianBlur(sharpened, (3, 3), 0)
+    blended = cv2.addWeighted(sharpened, 0.85, softened, 0.15, 0)
+    blended_rgb = cv2.cvtColor(blended, cv2.COLOR_GRAY2RGB)
+    return Image.fromarray(blended_rgb)
 
+
+def preprocess_text_crop_variants(image: Image.Image) -> list[Image.Image]:
+    base = preprocess_text_crop(image)
+    np_image = np.array(base)
+    gray = cv2.cvtColor(np_image, cv2.COLOR_RGB2GRAY)
     thresh = cv2.adaptiveThreshold(
-        enhanced,
+        gray,
         255,
         cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
         cv2.THRESH_BINARY,
         31,
-        10,
+        8,
     )
     kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 2))
     closed = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel, iterations=1)
-
-    sharpen_kernel = np.array([[0, -1, 0], [-1, 5, -1], [0, -1, 0]], dtype=np.float32)
-    sharpened = cv2.filter2D(closed, -1, sharpen_kernel)
-
-    blurred = cv2.GaussianBlur(enhanced, (3, 3), 0)
-    background_removed = cv2.subtract(enhanced, blurred)
-    cleaned = cv2.addWeighted(sharpened, 0.85, background_removed, 0.15, 0)
-    cleaned_rgb = cv2.cvtColor(cleaned, cv2.COLOR_GRAY2RGB)
-    return Image.fromarray(cleaned_rgb)
+    threshold_rgb = cv2.cvtColor(closed, cv2.COLOR_GRAY2RGB)
+    return [base, Image.fromarray(threshold_rgb)]
 
 
 DATE_PATTERN = re.compile(r"(?<!\d)(\d{2})[/-](\d{2})[/-](\d{2})(?!\d)")
@@ -89,6 +93,26 @@ def _is_relevant_text(text: str) -> bool:
     if CODE_PATTERN.search(text):
         return True
     return bool(re.search(r"\d", text))
+
+
+def _clean_ocr_text(text: str) -> str:
+    return re.sub(r"[^A-Za-z0-9/:.\- ]+", " ", text).strip()
+
+
+def _score_ocr_text(text: str) -> int:
+    cleaned = _clean_ocr_text(text)
+    score = 0
+    score += len(re.findall(r"[0-9]", cleaned)) * 2
+    score += len(re.findall(r"[A-Za-z]", cleaned))
+    if DATE_PATTERN.search(cleaned):
+        score += 6
+    if TIME_PATTERN.search(cleaned):
+        score += 5
+    if CODE_PATTERN.search(cleaned):
+        score += 3
+    if _is_relevant_text(cleaned):
+        score += 2
+    return score
 
 
 def crop_text_regions(image: Image.Image) -> list[Image.Image]:
@@ -119,7 +143,14 @@ def crop_text_regions(image: Image.Image) -> list[Image.Image]:
                     lower = min(int(y_max * height), height)
                     if right <= left or lower <= upper:
                         continue
-                    box = (left, upper, right, lower)
+                    pad_x = max(int((right - left) * 0.15), 3)
+                    pad_y = max(int((lower - upper) * 0.2), 3)
+                    box = (
+                        max(left - pad_x, 0),
+                        max(upper - pad_y, 0),
+                        min(right + pad_x, width),
+                        min(lower + pad_y, height),
+                    )
                     all_boxes.append(box)
 
     if not all_boxes:
@@ -141,8 +172,18 @@ class OCRModel:
         crops = crop_text_regions(preprocessed)
         extracted: list[str] = []
         for crop in crops:
-            processed_crop = preprocess_text_crop(crop)
-            extracted.extend(self.predictor(processed_crop))
+            variants = preprocess_text_crop_variants(crop)
+            best_texts: list[str] = []
+            best_score = -1
+            for variant in variants:
+                candidate_texts = self.predictor(variant)
+                candidate_joined = " ".join(candidate_texts)
+                candidate_score = _score_ocr_text(candidate_joined)
+                if candidate_score > best_score:
+                    best_score = candidate_score
+                    best_texts = candidate_texts
+            cleaned = [_clean_ocr_text(text) for text in best_texts if text.strip()]
+            extracted.extend([text for text in cleaned if text])
         return extracted
 
 
