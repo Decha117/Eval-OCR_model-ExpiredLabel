@@ -116,47 +116,7 @@ def _score_ocr_text(text: str) -> int:
 
 
 def crop_text_regions(image: Image.Image) -> list[Image.Image]:
-    if not importlib.util.find_spec("doctr"):
-        return [image]
-
-    from doctr.models import ocr_predictor
-
-    predictor = ocr_predictor(det_arch="fast_base", reco_arch="crnn_vgg16_bn", pretrained=True)
-    result = predictor([np.array(image)])
-    export = result.export()
-
-    width, height = image.size
-    all_boxes: list[tuple[int, int, int, int]] = []
-
-    for page in export.get("pages", []):
-        for block in page.get("blocks", []):
-            for line in block.get("lines", []):
-                words = line.get("words", [])
-                for word in words:
-                    geometry = word.get("geometry")
-                    if not geometry:
-                        continue
-                    (x_min, y_min), (x_max, y_max) = geometry
-                    left = max(int(x_min * width), 0)
-                    upper = max(int(y_min * height), 0)
-                    right = min(int(x_max * width), width)
-                    lower = min(int(y_max * height), height)
-                    if right <= left or lower <= upper:
-                        continue
-                    pad_x = max(int((right - left) * 0.15), 3)
-                    pad_y = max(int((lower - upper) * 0.2), 3)
-                    box = (
-                        max(left - pad_x, 0),
-                        max(upper - pad_y, 0),
-                        min(right + pad_x, width),
-                        min(lower + pad_y, height),
-                    )
-                    all_boxes.append(box)
-
-    if not all_boxes:
-        return [image]
-
-    return [image.crop(box) for box in all_boxes]
+    return [image]
 
 
 @dataclass
