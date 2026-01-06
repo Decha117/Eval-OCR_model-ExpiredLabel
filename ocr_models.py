@@ -148,9 +148,6 @@ def crop_text_regions(image: Image.Image) -> list[Image.Image]:
         crop = image.crop((x0, y0, x1, y1))
         crops.append(crop)
 
-    if not crops:
-        return [image]
-
     crops.sort(key=lambda c: c.size[1], reverse=True)
     return crops
 
@@ -166,6 +163,8 @@ class OCRModel:
             return []
         preprocessed = preprocess_image(image)
         crops = crop_text_regions(preprocessed)
+        if not crops:
+            return []
         extracted: list[str] = []
         for crop in crops:
             variants = preprocess_text_crop_variants(crop)
