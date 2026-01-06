@@ -66,13 +66,11 @@ def build_models() -> Iterable[OCRModel]:
     else:
         models.append(
             OCRModel(
-                name="PaddleOCR (PP-OCRv4 / PP-OCRv3 Mobile TensorRT INT8)",
+                name="PP-OCRv3 Mobile",
                 predictor=None,
                 error="ยังไม่ได้ติดตั้งแพ็กเกจ paddleocr",
             )
         )
-
-    models.append(build_tesseract_model())
 
     if importlib.util.find_spec("doctr"):
         models.extend(build_doctr_models())
@@ -107,11 +105,7 @@ def build_doctr_models() -> Iterable[OCRModel]:
 
 def build_paddle_models() -> Iterable[OCRModel]:
     return [
-        OCRModel(name="PaddleOCR PP-OCRv4", predictor=paddleocr_predictor("PP-OCRv4")),
-        OCRModel(
-            name="PaddleOCR PP-OCRv3 Mobile TensorRT INT8",
-            predictor=paddleocr_predictor("PP-OCRv3", use_tensorrt=True, precision="int8"),
-        ),
+        OCRModel(name="PP-OCRv3 Mobile", predictor=paddleocr_predictor("PP-OCRv3")),
     ]
 
 
@@ -171,32 +165,3 @@ def extract_doctr_text(result) -> list[str]:
                     if value:
                         words.append(value)
     return words
-
-
-def build_tesseract_model() -> OCRModel:
-    if not importlib.util.find_spec("pytesseract"):
-        return OCRModel(
-            name="Tesseract",
-            predictor=None,
-            error="ยังไม่ได้ติดตั้งแพ็กเกจ pytesseract",
-        )
-
-    try:
-        import pytesseract
-
-        _ = pytesseract.get_tesseract_version()
-    except (ImportError, RuntimeError, OSError) as exc:
-        return OCRModel(
-            name="Tesseract",
-            predictor=None,
-            error=f"Tesseract ใช้งานไม่ได้: {exc}",
-        )
-
-    return OCRModel(name="Tesseract", predictor=tesseract_predictor)
-
-
-def tesseract_predictor(image: Image.Image) -> list[str]:
-    import pytesseract
-
-    text = pytesseract.image_to_string(image, config="--oem 3 --psm 6")
-    return [line.strip() for line in text.splitlines() if line.strip()]
