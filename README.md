@@ -16,8 +16,16 @@ python app.py
 
 ## หมายเหตุ
 
-- หากต้องการใช้งาน RapidOCR ให้ติดตั้ง `rapidocr-onnxruntime`
-- หากต้องการใช้งาน PaddleOCR ให้ติดตั้ง `paddleocr` เวอร์ชัน 2.7 ขึ้นไป (รองรับ `use_gpu`)
-  - ถ้าต้องการใช้ GPU ให้ติดตั้ง `paddlepaddle-gpu` ให้ตรงกับเวอร์ชัน CUDA ของเครื่อง
-- หากต้องการใช้งาน Doctr (เฉพาะ fast_base และ linknet_resnet34) ให้ติดตั้ง `python-doctr`
-- หากต้องการใช้งาน Tesseract ให้ติดตั้ง `pytesseract` และตัวโปรแกรม `tesseract-ocr` ในระบบ
+ระบบประเมินจะใช้รายชื่อโมเดลการแข่งขันดังนี้
+- Doctr fast_base
+- Doctr linknet_resnet34
+- RapidOCR
+- PP-OCRv3 Mobile
+
+### สคริปต์ติดตั้งโมเดล
+
+รันสคริปต์ด้านล่างเพื่อติดตั้งแพ็กเกจที่จำเป็นสำหรับโมเดลทั้งหมด:
+
+```bash
+bash scripts/install_ocr_models.sh
+```
