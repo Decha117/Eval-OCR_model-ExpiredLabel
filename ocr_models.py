@@ -105,7 +105,7 @@ def build_doctr_models() -> Iterable[OCRModel]:
 
 def build_paddle_models() -> Iterable[OCRModel]:
     return [
-        OCRModel(name="PP-OCRv3 Mobile", predictor=paddleocr_predictor("PP-OCRv3")),
+        OCRModel(name="PP-OCRv3 Mobile", predictor=paddleocr_predictor("PP-OCRv3", use_gpu=True)),
     ]
 
 
