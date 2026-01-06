@@ -121,7 +121,7 @@ def crop_text_regions(image: Image.Image) -> list[Image.Image]:
 
     from doctr.models import ocr_predictor
 
-    predictor = ocr_predictor(det_arch="db_resnet50", reco_arch="crnn_vgg16_bn", pretrained=True)
+    predictor = ocr_predictor(det_arch="fast_base", reco_arch="crnn_vgg16_bn", pretrained=True)
     result = predictor([np.array(image)])
     export = result.export()
 
@@ -201,12 +201,14 @@ def build_models() -> Iterable[OCRModel]:
             )
         )
 
+    models.append(build_tesseract_model())
+
     if importlib.util.find_spec("doctr"):
         models.extend(build_doctr_models())
     else:
         models.append(
             OCRModel(
-                name="Doctr (ทั้งหมด)",
+                name="Doctr (fast_base, linknet_resnet34)",
                 predictor=None,
                 error="ยังไม่ได้ติดตั้งแพ็กเกจ python-doctr",
             )
@@ -227,15 +229,7 @@ def rapidocr_predictor(image: Image.Image) -> list[str]:
 
 def build_doctr_models() -> Iterable[OCRModel]:
     return [
-        OCRModel(name="Doctr CRNN", predictor=doctr_predictor("db_resnet50", "crnn_vgg16_bn")),
-        OCRModel(name="Doctr PARSeq", predictor=doctr_predictor("db_resnet50", "parseq")),
-        OCRModel(name="Doctr linknet_resnet18", predictor=doctr_predictor("linknet_resnet18", "crnn_vgg16_bn")),
         OCRModel(name="Doctr linknet_resnet34", predictor=doctr_predictor("linknet_resnet34", "crnn_vgg16_bn")),
-        OCRModel(name="Doctr linknet_resnet50", predictor=doctr_predictor("linknet_resnet50", "crnn_vgg16_bn")),
-        OCRModel(name="Doctr db_resnet50", predictor=doctr_predictor("db_resnet50", "crnn_vgg16_bn")),
-        OCRModel(name="Doctr db_mobilenet_v3_large", predictor=doctr_predictor("db_mobilenet_v3_large", "crnn_vgg16_bn")),
-        OCRModel(name="Doctr fast_tiny", predictor=doctr_predictor("fast_tiny", "crnn_vgg16_bn")),
-        OCRModel(name="Doctr fast_small", predictor=doctr_predictor("fast_small", "crnn_vgg16_bn")),
         OCRModel(name="Doctr fast_base", predictor=doctr_predictor("fast_base", "crnn_vgg16_bn")),
     ]
 
@@ -263,3 +257,32 @@ def extract_doctr_text(result) -> list[str]:
                     if value:
                         words.append(value)
     return words
+
+
+def build_tesseract_model() -> OCRModel:
+    if not importlib.util.find_spec("pytesseract"):
+        return OCRModel(
+            name="Tesseract",
+            predictor=None,
+            error="ยังไม่ได้ติดตั้งแพ็กเกจ pytesseract",
+        )
+
+    try:
+        import pytesseract
+
+        _ = pytesseract.get_tesseract_version()
+    except (ImportError, RuntimeError, OSError) as exc:
+        return OCRModel(
+            name="Tesseract",
+            predictor=None,
+            error=f"Tesseract ใช้งานไม่ได้: {exc}",
+        )
+
+    return OCRModel(name="Tesseract", predictor=tesseract_predictor)
+
+
+def tesseract_predictor(image: Image.Image) -> list[str]:
+    import pytesseract
+
+    text = pytesseract.image_to_string(image, config="--oem 3 --psm 6")
+    return [line.strip() for line in text.splitlines() if line.strip()]
