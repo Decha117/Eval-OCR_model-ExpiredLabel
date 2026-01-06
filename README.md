@@ -17,5 +17,6 @@ python app.py
 ## หมายเหตุ
 
 - หากต้องการใช้งาน RapidOCR ให้ติดตั้ง `rapidocr-onnxruntime`
+- หากต้องการใช้งาน PaddleOCR ให้ติดตั้ง `paddleocr`
 - หากต้องการใช้งาน Doctr (เฉพาะ fast_base และ linknet_resnet34) ให้ติดตั้ง `python-doctr`
 - หากต้องการใช้งาน Tesseract ให้ติดตั้ง `pytesseract` และตัวโปรแกรม `tesseract-ocr` ในระบบ

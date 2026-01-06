@@ -9,6 +9,8 @@ import numpy as np
 import cv2
 from PIL import Image
 
+_PADDLE_OCR_CACHE: dict[tuple[str, bool, str], object] = {}
+
 
 def normalize_text(text: str) -> str:
     return " ".join(text.lower().split())
@@ -196,6 +198,17 @@ def build_models() -> Iterable[OCRModel]:
             )
         )
 
+    if importlib.util.find_spec("paddleocr"):
+        models.extend(build_paddle_models())
+    else:
+        models.append(
+            OCRModel(
+                name="PaddleOCR (PP-OCRv4 / PP-OCRv3 Mobile TensorRT INT8)",
+                predictor=None,
+                error="ยังไม่ได้ติดตั้งแพ็กเกจ paddleocr",
+            )
+        )
+
     models.append(build_tesseract_model())
 
     if importlib.util.find_spec("doctr"):
@@ -227,6 +240,49 @@ def build_doctr_models() -> Iterable[OCRModel]:
         OCRModel(name="Doctr linknet_resnet34", predictor=doctr_predictor("linknet_resnet34", "crnn_vgg16_bn")),
         OCRModel(name="Doctr fast_base", predictor=doctr_predictor("fast_base", "crnn_vgg16_bn")),
     ]
+
+
+def build_paddle_models() -> Iterable[OCRModel]:
+    return [
+        OCRModel(name="PaddleOCR PP-OCRv4", predictor=paddleocr_predictor("PP-OCRv4")),
+        OCRModel(
+            name="PaddleOCR PP-OCRv3 Mobile TensorRT INT8",
+            predictor=paddleocr_predictor("PP-OCRv3", use_tensorrt=True, precision="int8"),
+        ),
+    ]
+
+
+def paddleocr_predictor(
+    ocr_version: str,
+    use_tensorrt: bool = False,
+    precision: str = "fp32",
+) -> Callable[[Image.Image], list[str]]:
+    def _predict(image: Image.Image) -> list[str]:
+        from paddleocr import PaddleOCR
+
+        key = (ocr_version, use_tensorrt, precision)
+        if key not in _PADDLE_OCR_CACHE:
+            _PADDLE_OCR_CACHE[key] = PaddleOCR(
+                use_angle_cls=True,
+                lang="en",
+                ocr_version=ocr_version,
+                use_tensorrt=use_tensorrt,
+                precision=precision,
+                use_gpu=use_tensorrt,
+                show_log=False,
+            )
+        engine = _PADDLE_OCR_CACHE[key]
+        result = engine.ocr(np.array(image), cls=True)
+        if not result:
+            return []
+        lines = result[0] if isinstance(result, list) and len(result) == 1 else result
+        texts: list[str] = []
+        for line in lines:
+            if len(line) > 1 and isinstance(line[1], (list, tuple)) and line[1]:
+                texts.append(str(line[1][0]))
+        return texts
+
+    return _predict
 
 
 def doctr_predictor(det_arch: str, reco_arch: str) -> Callable[[Image.Image], list[str]]:
