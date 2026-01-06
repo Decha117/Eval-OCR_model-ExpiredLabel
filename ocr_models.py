@@ -112,12 +112,14 @@ def build_paddle_models() -> Iterable[OCRModel]:
 def paddleocr_predictor(
     ocr_version: str,
     use_tensorrt: bool = False,
+    use_gpu: bool = False,
     precision: str = "fp32",
 ) -> Callable[[Image.Image], list[str]]:
     def _predict(image: Image.Image) -> list[str]:
         from paddleocr import PaddleOCR
 
-        key = (ocr_version, use_tensorrt, precision)
+        effective_use_gpu = use_gpu or use_tensorrt
+        key = (ocr_version, use_tensorrt, effective_use_gpu, precision)
         if key not in _PADDLE_OCR_CACHE:
             _PADDLE_OCR_CACHE[key] = PaddleOCR(
                 use_angle_cls=True,
@@ -125,7 +127,7 @@ def paddleocr_predictor(
                 ocr_version=ocr_version,
                 use_tensorrt=use_tensorrt,
                 precision=precision,
-                use_gpu=use_tensorrt,
+                use_gpu=effective_use_gpu,
             )
         engine = _PADDLE_OCR_CACHE[key]
         result = engine.ocr(np.array(image), cls=True)
