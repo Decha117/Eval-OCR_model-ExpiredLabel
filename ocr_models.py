@@ -107,33 +107,41 @@ def build_doctr_models() -> Iterable[OCRModel]:
 
 def build_paddle_models() -> Iterable[OCRModel]:
     return [
-        OCRModel(name="PaddleOCR PP-OCRv4", predictor=paddleocr_predictor("PP-OCRv4")),
+        OCRModel(name="PaddleOCR PP-OCRv4", predictor=paddleocr_predictor("PP-OCRv4", use_gpu=True)),
         OCRModel(
             name="PaddleOCR PP-OCRv3 Mobile TensorRT INT8",
-            predictor=paddleocr_predictor("PP-OCRv3", use_tensorrt=True, precision="int8"),
+            predictor=paddleocr_predictor("PP-OCRv3", use_gpu=True, use_tensorrt=True, precision="int8"),
         ),
     ]
 
 
 def paddleocr_predictor(
     ocr_version: str,
+    use_gpu: bool = False,
     use_tensorrt: bool = False,
     precision: str = "fp32",
 ) -> Callable[[Image.Image], list[str]]:
     def _predict(image: Image.Image) -> list[str]:
+        import inspect
+
         from paddleocr import PaddleOCR
 
-        key = (ocr_version, use_tensorrt, precision)
+        key = (ocr_version, use_gpu, use_tensorrt, precision)
         if key not in _PADDLE_OCR_CACHE:
-            _PADDLE_OCR_CACHE[key] = PaddleOCR(
+            if "use_gpu" not in inspect.signature(PaddleOCR).parameters:
+                raise RuntimeError(
+                    "PaddleOCR เวอร์ชันนี้ไม่รองรับ use_gpu โปรดอัปเกรดเป็นเวอร์ชัน 2.7 ขึ้นไป"
+                )
+            kwargs = dict(
                 use_angle_cls=True,
                 lang="en",
                 ocr_version=ocr_version,
+                use_gpu=use_gpu,
                 use_tensorrt=use_tensorrt,
                 precision=precision,
-                use_gpu=use_tensorrt,
                 show_log=False,
             )
+            _PADDLE_OCR_CACHE[key] = PaddleOCR(**kwargs)
         engine = _PADDLE_OCR_CACHE[key]
         result = engine.ocr(np.array(image), cls=True)
         if not result:

@@ -17,6 +17,7 @@ python app.py
 ## หมายเหตุ
 
 - หากต้องการใช้งาน RapidOCR ให้ติดตั้ง `rapidocr-onnxruntime`
-- หากต้องการใช้งาน PaddleOCR ให้ติดตั้ง `paddleocr`
+- หากต้องการใช้งาน PaddleOCR ให้ติดตั้ง `paddleocr` เวอร์ชัน 2.7 ขึ้นไป (รองรับ `use_gpu`)
+  - ระบบตั้งค่าให้ใช้ GPU กับ PaddleOCR โดยอัตโนมัติ จึงต้องติดตั้ง `paddlepaddle-gpu` ให้ตรงกับเวอร์ชัน CUDA ของเครื่อง
 - หากต้องการใช้งาน Doctr (เฉพาะ fast_base และ linknet_resnet34) ให้ติดตั้ง `python-doctr`
 - หากต้องการใช้งาน Tesseract ให้ติดตั้ง `pytesseract` และตัวโปรแกรม `tesseract-ocr` ในระบบ
