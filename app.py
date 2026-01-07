@@ -25,6 +25,11 @@ from ocr_models import OCRModel, OCRPrediction, build_models, normalize_text, pr
 UPLOAD_DIR = Path("uploads")
 ALLOWED_EXTENSIONS = {".png", ".jpg", ".jpeg", ".bmp", ".tiff"}
 JOBS: dict[str, dict] = {}
+PREPROCESSING_OPTIONS = [
+    {"key": "crop_bottom_half", "label": "ตัดภาพครึ่งล่าง"},
+    {"key": "rotate_minus_3", "label": "หมุนแก้เอียง -3°"},
+    {"key": "clahe", "label": "เพิ่มคอนทราสต์ (CLAHE)"},
+]
 
 
 @dataclass
@@ -54,8 +59,10 @@ def create_app() -> Flask:
         per_image_results: list[dict] = []
         error: str | None = None
         entries: list[dict] = []
+        selected_preprocess = default_preprocess_steps()
         if request.method == "POST":
             entries = parse_entries(request)
+            selected_preprocess = parse_preprocess_steps(request)
 
             if not entries:
                 error = "กรุณาอัปโหลดรูปภาพอย่างน้อย 1 รูป"
@@ -65,6 +72,8 @@ def create_app() -> Flask:
                     per_image_results=per_image_results,
                     results=results,
                     error=error,
+                    preprocessing_options=PREPROCESSING_OPTIONS,
+                    selected_preprocess=selected_preprocess,
                 )
 
             for entry in entries:
@@ -78,6 +87,8 @@ def create_app() -> Flask:
                         per_image_results=per_image_results,
                         results=results,
                         error=error,
+                        preprocessing_options=PREPROCESSING_OPTIONS,
+                        selected_preprocess=selected_preprocess,
                     )
 
                 filename = secure_filename(file.filename) or f"upload_{entry['index']}{extension}"
@@ -94,12 +105,14 @@ def create_app() -> Flask:
                         per_image_results=per_image_results,
                         results=results,
                         error=error,
+                        preprocessing_options=PREPROCESSING_OPTIONS,
+                        selected_preprocess=selected_preprocess,
                     )
 
                 entry["image"] = image
                 entry["image_url"] = url_for("uploaded_file", filename=image_path.name)
 
-            results, per_image_results = evaluate_models(entries)
+            results, per_image_results = evaluate_models(entries, selected_preprocess)
 
         return render_template(
             "index.html",
@@ -107,11 +120,14 @@ def create_app() -> Flask:
             per_image_results=per_image_results,
             results=results,
             error=error,
+            preprocessing_options=PREPROCESSING_OPTIONS,
+            selected_preprocess=selected_preprocess,
         )
 
     @app.route("/start", methods=["POST"])
     def start_job():
         entries = parse_entries(request)
+        selected_preprocess = parse_preprocess_steps(request)
         if not entries:
             return {"error": "กรุณาอัปโหลดรูปภาพอย่างน้อย 1 รูป"}, 400
 
@@ -143,7 +159,11 @@ def create_app() -> Flask:
             "results": [],
             "per_image_results": [],
         }
-        thread = threading.Thread(target=run_job, args=(job_id, prepared), daemon=True)
+        thread = threading.Thread(
+            target=run_job,
+            args=(job_id, prepared, selected_preprocess),
+            daemon=True,
+        )
         thread.start()
         return {"job_id": job_id}
 
@@ -190,7 +210,7 @@ def create_app() -> Flask:
     return app
 
 
-def evaluate_models(entries: list[dict]) -> tuple[list[dict], list[dict]]:
+def evaluate_models(entries: list[dict], preprocess_steps: list[str]) -> tuple[list[dict], list[dict]]:
     models = list(build_models())
     per_image_results: list[dict] = []
     overall: dict[str, dict] = {}
@@ -210,11 +230,11 @@ def evaluate_models(entries: list[dict]) -> tuple[list[dict], list[dict]]:
         normalized_labels = {key: normalize_text(value) for key, value in labels.items()}
         image = entry["image"]
         start_time = time.perf_counter()
-        processed_image_url = save_processed_preview(image)
+        processed_image_url = save_processed_preview(image, preprocess_steps)
         image_results: list[dict] = []
 
         for model in models:
-            result = evaluate_model(model, normalized_labels, image)
+            result = evaluate_model(model, normalized_labels, image, preprocess_steps)
             image_results.append(result)
             overall_result = overall[model.name]
             overall_result["correct"] += result["correct"]
@@ -247,6 +267,7 @@ def evaluate_model(
     model: OCRModel,
     labels: dict[str, str],
     image: Image.Image,
+    preprocess_steps: list[str],
 ) -> dict:
     if model.error:
         return {
@@ -261,7 +282,7 @@ def evaluate_model(
             "reason": model.error,
         }
 
-    prediction = model.predict(image)
+    prediction = model.predict(image, preprocess_steps)
     output_text = " ".join(prediction.text)
     normalized_text = normalize_text(output_text)
     bbox_image_url = save_bbox_preview(prediction, model.name)
@@ -294,12 +315,12 @@ def evaluate_model(
     }
 
 
-def build_processed_preview(image: Image.Image) -> Image.Image:
-    return preprocess_image(image)
+def build_processed_preview(image: Image.Image, preprocess_steps: list[str]) -> Image.Image:
+    return preprocess_image(image, preprocess_steps)
 
 
-def save_processed_preview(image: Image.Image) -> str:
-    processed = build_processed_preview(image)
+def save_processed_preview(image: Image.Image, preprocess_steps: list[str]) -> str:
+    processed = build_processed_preview(image, preprocess_steps)
     filename = f"processed_{uuid.uuid4().hex}.jpg"
     image_path = UPLOAD_DIR / filename
     processed.save(image_path, format="JPEG", quality=90)
@@ -320,8 +341,9 @@ def save_bbox_preview(prediction: OCRPrediction, model_name: str) -> str | None:
     return f"/uploads/{image_path.name}"
 
 
-def run_job(job_id: str, entries: list[dict]) -> None:
+def run_job(job_id: str, entries: list[dict], preprocess_steps: list[str]) -> None:
     job = JOBS[job_id]
+    job["logs"].append(f"เลือก preprocessing: {format_preprocess_steps(preprocess_steps)}")
     job["logs"].append("เริ่มประมวลผลภาพทั้งหมด")
 
     try:
@@ -352,12 +374,12 @@ def run_job(job_id: str, entries: list[dict]) -> None:
                 raise
             job["logs"].append("เตรียมภาพ (preprocess)")
             start_time = time.perf_counter()
-            processed_image_url = save_processed_preview(image)
+            processed_image_url = save_processed_preview(image, preprocess_steps)
 
             image_results: list[dict] = []
             for model in models:
                 job["logs"].append(f"ประมวลผลด้วยโมเดล {model.name}")
-                result = evaluate_model(model, normalized_labels, image)
+                result = evaluate_model(model, normalized_labels, image, preprocess_steps)
                 image_results.append(result)
                 overall_result = overall[model.name]
                 overall_result["correct"] += result["correct"]
@@ -434,6 +456,23 @@ def parse_entries(request) -> list[dict]:
         )
 
     return entries
+
+
+def parse_preprocess_steps(request) -> list[str]:
+    allowed = {option["key"] for option in PREPROCESSING_OPTIONS}
+    steps = [step for step in request.form.getlist("preprocess_steps") if step in allowed]
+    return steps
+
+
+def default_preprocess_steps() -> list[str]:
+    return [option["key"] for option in PREPROCESSING_OPTIONS]
+
+
+def format_preprocess_steps(steps: list[str]) -> str:
+    if not steps:
+        return "ไม่ใช้ preprocessing"
+    labels = {option["key"]: option["label"] for option in PREPROCESSING_OPTIONS}
+    return ", ".join(labels.get(step, step) for step in steps)
 
 
 def main() -> None:

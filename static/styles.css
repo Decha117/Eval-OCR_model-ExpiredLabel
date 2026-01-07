@@ -38,6 +38,29 @@ body {
   margin-bottom: 20px;
 }
 
+.checklist {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.checklist-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  font-weight: 600;
+}
+
+.checklist-item input {
+  width: 18px;
+  height: 18px;
+  accent-color: #3b82f6;
+}
+
 .file-upload {
   display: inline-flex;
   align-items: center;
