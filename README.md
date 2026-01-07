@@ -20,7 +20,7 @@ python app.py
 - Doctr fast_base
 - Doctr linknet_resnet34
 
-หมายเหตุ: ใช้งาน Doctr ผ่าน GPU (CUDA) เท่านั้น
+หมายเหตุ: Doctr ต้องใช้ GPU (CUDA) เท่านั้น กรุณาเปิดใช้งาน CUDA ก่อนใช้งาน
 
 ### สคริปต์ติดตั้งโมเดล
 
