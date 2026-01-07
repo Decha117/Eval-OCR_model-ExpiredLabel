@@ -195,6 +195,15 @@ body {
   font-size: 13px;
 }
 
+.ocr-bbox img {
+  max-width: 160px;
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+  display: block;
+  border: 1px solid #e2e8f0;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;
