@@ -38,6 +38,7 @@
     {% for image in per_image_results %}
       <div class="image-block">
         <h3>{{ image.filename }}</h3>
+        <p class="muted">เวลาประมวลผล: {{ image.processing_time_seconds | round(2) }} วินาที</p>
         {% if image.processed_image_url %}
           <div class="image-preview">
             <span class="muted">ภาพหลังการ preprocess + text detection</span>

@@ -209,6 +209,7 @@ def evaluate_models(entries: list[dict]) -> tuple[list[dict], list[dict]]:
         labels = entry["labels"]
         normalized_labels = {key: normalize_text(value) for key, value in labels.items()}
         image = entry["image"]
+        start_time = time.perf_counter()
         processed_image_url = save_processed_preview(image)
         image_results: list[dict] = []
 
@@ -219,12 +220,14 @@ def evaluate_models(entries: list[dict]) -> tuple[list[dict], list[dict]]:
             overall_result["correct"] += result["correct"]
             overall_result["total"] += result["total"]
 
+        processing_time_seconds = time.perf_counter() - start_time
         per_image_results.append(
             {
                 "filename": entry["filename"],
                 "image_url": entry.get("image_url"),
                 "processed_image_url": processed_image_url,
                 "labels": labels,
+                "processing_time_seconds": processing_time_seconds,
                 "results": sorted(image_results, key=lambda item: item["accuracy"], reverse=True),
             }
         )
@@ -331,6 +334,7 @@ def run_job(job_id: str, entries: list[dict]) -> None:
                 job["logs"].append(f"ไม่สามารถอ่านไฟล์ภาพ {entry['filename']}")
                 raise
             job["logs"].append("เตรียมภาพ (preprocess)")
+            start_time = time.perf_counter()
             processed_image_url = save_processed_preview(image)
 
             image_results: list[dict] = []
@@ -345,12 +349,14 @@ def run_job(job_id: str, entries: list[dict]) -> None:
                 completed_steps += 1
                 job["progress"] = int(completed_steps / total_steps * 100)
 
+            processing_time_seconds = time.perf_counter() - start_time
             per_image_results.append(
                 {
                     "filename": entry["filename"],
                     "image_url": entry.get("image_url"),
                     "processed_image_url": processed_image_url,
                     "labels": labels,
+                    "processing_time_seconds": processing_time_seconds,
                     "results": sorted(image_results, key=lambda item: item["accuracy"], reverse=True),
                 }
             )
