@@ -49,17 +49,6 @@ class OCRModel:
 def build_models() -> Iterable[OCRModel]:
     models: list[OCRModel] = []
 
-    if importlib.util.find_spec("rapidocr_onnxruntime"):
-        models.append(OCRModel(name="RapidOCR", predictor=rapidocr_predictor))
-    else:
-        models.append(
-            OCRModel(
-                name="RapidOCR",
-                predictor=None,
-                error="ยังไม่ได้ติดตั้งแพ็กเกจ rapidocr-onnxruntime",
-            )
-        )
-
     if importlib.util.find_spec("doctr"):
         models.extend(build_doctr_models())
     else:
@@ -74,19 +63,42 @@ def build_models() -> Iterable[OCRModel]:
     return models
 
 
-def rapidocr_predictor(image: Image.Image) -> list[str]:
-    from rapidocr_onnxruntime import RapidOCR
-
-    engine = RapidOCR()
-    result, _ = engine(np.array(image))
-    if not result:
-        return []
-    return [text for _, text, _ in result]
-
-
 def build_doctr_models() -> Iterable[OCRModel]:
+    try:
+        import torch
+    except ModuleNotFoundError:
+        return [
+            OCRModel(
+                name="Doctr linknet_resnet34",
+                predictor=None,
+                error="ยังไม่ได้ติดตั้งแพ็กเกจ torch ที่รองรับ GPU",
+            ),
+            OCRModel(
+                name="Doctr fast_base",
+                predictor=None,
+                error="ยังไม่ได้ติดตั้งแพ็กเกจ torch ที่รองรับ GPU",
+            ),
+        ]
+
+    if not torch.cuda.is_available():
+        return [
+            OCRModel(
+                name="Doctr linknet_resnet34",
+                predictor=None,
+                error="ต้องใช้ GPU (CUDA) เท่านั้น กรุณาเปิดใช้งาน CUDA ก่อนใช้งาน Doctr",
+            ),
+            OCRModel(
+                name="Doctr fast_base",
+                predictor=None,
+                error="ต้องใช้ GPU (CUDA) เท่านั้น กรุณาเปิดใช้งาน CUDA ก่อนใช้งาน Doctr",
+            ),
+        ]
+
     return [
-        OCRModel(name="Doctr linknet_resnet34", predictor=doctr_predictor("linknet_resnet34", "crnn_vgg16_bn")),
+        OCRModel(
+            name="Doctr linknet_resnet34",
+            predictor=doctr_predictor("linknet_resnet34", "crnn_vgg16_bn"),
+        ),
         OCRModel(name="Doctr fast_base", predictor=doctr_predictor("fast_base", "crnn_vgg16_bn")),
     ]
 
@@ -95,7 +107,12 @@ def doctr_predictor(det_arch: str, reco_arch: str) -> Callable[[Image.Image], li
     def _predict(image: Image.Image) -> list[str]:
         from doctr.models import ocr_predictor
 
-        predictor = ocr_predictor(det_arch=det_arch, reco_arch=reco_arch, pretrained=True)
+        predictor = ocr_predictor(
+            det_arch=det_arch,
+            reco_arch=reco_arch,
+            pretrained=True,
+            device="cuda",
+        )
         np_image = np.array(image)
         result = predictor([np_image])
         return extract_doctr_text(result)

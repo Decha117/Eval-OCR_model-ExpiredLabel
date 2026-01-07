@@ -19,7 +19,8 @@ python app.py
 ระบบประเมินจะใช้รายชื่อโมเดลการแข่งขันดังนี้
 - Doctr fast_base
 - Doctr linknet_resnet34
-- RapidOCR
+
+หมายเหตุ: ใช้งาน Doctr ผ่าน GPU (CUDA) เท่านั้น
 
 ### สคริปต์ติดตั้งโมเดล
 
