@@ -20,7 +20,6 @@ python app.py
 - Doctr fast_base
 - Doctr linknet_resnet34
 - RapidOCR
-- PP-OCRv3 Mobile
 
 ### สคริปต์ติดตั้งโมเดล
 
