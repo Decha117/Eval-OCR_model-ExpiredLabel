@@ -14,8 +14,10 @@ def normalize_text(text: str) -> str:
 
 def preprocess_image(image: Image.Image) -> Image.Image:
     np_image = np.array(image)
+    height = np_image.shape[0]
+    np_image = np_image[height // 2 :, :]
     center = (np_image.shape[1] / 2, np_image.shape[0] / 2)
-    rotation = cv2.getRotationMatrix2D(center, -5, 1.0)
+    rotation = cv2.getRotationMatrix2D(center, -3, 1.0)
     np_image = cv2.warpAffine(
         np_image,
         rotation,
