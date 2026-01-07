@@ -24,6 +24,23 @@
       {% endif %}
 
       <form class="form" id="ocr-form" method="post" enctype="multipart/form-data">
+        <div class="form-section">
+          <h2>ตัวเลือก Preprocessing</h2>
+          <p class="muted">เลือกขั้นตอนเตรียมภาพก่อนส่งเข้า OCR (สามารถเลือกได้หลายข้อ)</p>
+          <div class="checklist">
+            {% for option in preprocessing_options %}
+              <label class="checklist-item">
+                <input
+                  type="checkbox"
+                  name="preprocess_steps"
+                  value="{{ option.key }}"
+                  {% if option.key in selected_preprocess %}checked{% endif %}
+                />
+                <span>{{ option.label }}</span>
+              </label>
+            {% endfor %}
+          </div>
+        </div>
         <div class="form-header">
           <h2>รายการรูปภาพ</h2>
           <button class="secondary" type="button" id="add-entry">เพิ่มรูปภาพ</button>

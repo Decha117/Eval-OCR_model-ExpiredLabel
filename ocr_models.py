@@ -4,33 +4,46 @@ import importlib.util
 from dataclasses import dataclass
 from typing import Callable, Iterable
 
-import numpy as np
 import cv2
+import numpy as np
 from PIL import Image
 
 def normalize_text(text: str) -> str:
     return " ".join(text.lower().split())
 
 
-def preprocess_image(image: Image.Image) -> Image.Image:
-    np_image = np.array(image)
-    height = np_image.shape[0]
-    np_image = np_image[height // 2 :, :]
-    center = (np_image.shape[1] / 2, np_image.shape[0] / 2)
-    rotation = cv2.getRotationMatrix2D(center, -3, 1.0)
-    np_image = cv2.warpAffine(
-        np_image,
-        rotation,
-        (np_image.shape[1], np_image.shape[0]),
-        flags=cv2.INTER_LINEAR,
-        borderMode=cv2.BORDER_REPLICATE,
-    )
+PREPROCESSING_STEPS = ("crop_bottom_half", "rotate_minus_3", "clahe")
 
-    gray = cv2.cvtColor(np_image, cv2.COLOR_RGB2GRAY)
-    clahe = cv2.createCLAHE(clipLimit=4.0, tileGridSize=(8, 8))
-    enhanced = clahe.apply(gray)
-    enhanced_rgb = cv2.cvtColor(enhanced, cv2.COLOR_GRAY2RGB)
-    return Image.fromarray(enhanced_rgb)
+
+def preprocess_image(image: Image.Image, steps: Iterable[str] | None = None) -> Image.Image:
+    selected = list(steps) if steps is not None else list(PREPROCESSING_STEPS)
+    if not selected:
+        return image.copy()
+
+    np_image = np.array(image)
+
+    if "crop_bottom_half" in selected:
+        height = np_image.shape[0]
+        np_image = np_image[height // 2 :, :]
+
+    if "rotate_minus_3" in selected:
+        center = (np_image.shape[1] / 2, np_image.shape[0] / 2)
+        rotation = cv2.getRotationMatrix2D(center, -3, 1.0)
+        np_image = cv2.warpAffine(
+            np_image,
+            rotation,
+            (np_image.shape[1], np_image.shape[0]),
+            flags=cv2.INTER_LINEAR,
+            borderMode=cv2.BORDER_REPLICATE,
+        )
+
+    if "clahe" in selected:
+        gray = cv2.cvtColor(np_image, cv2.COLOR_RGB2GRAY)
+        clahe = cv2.createCLAHE(clipLimit=4.0, tileGridSize=(8, 8))
+        enhanced = clahe.apply(gray)
+        np_image = cv2.cvtColor(enhanced, cv2.COLOR_GRAY2RGB)
+
+    return Image.fromarray(np_image)
 
 
 @dataclass
@@ -46,8 +59,8 @@ class OCRModel:
     predictor: Callable[[Image.Image], OCRPrediction] | None
     error: str | None = None
 
-    def predict(self, image: Image.Image) -> OCRPrediction:
-        preprocessed = preprocess_image(image)
+    def predict(self, image: Image.Image, preprocess_steps: Iterable[str] | None = None) -> OCRPrediction:
+        preprocessed = preprocess_image(image, preprocess_steps)
         if not self.predictor:
             return OCRPrediction(text=[], boxes=[], image=preprocessed)
         return self.predictor(preprocessed)
