@@ -54,6 +54,7 @@
             <tr>
               <th>โมเดล</th>
               <th>ความแม่นยำ</th>
+              <th>เวลาประมวลผล (วินาที)</th>
               <th>Production</th>
               <th>Time</th>
               <th>Expiry</th>
@@ -68,6 +69,7 @@
             <tr>
               <td>{{ result.name }}</td>
               <td>{{ (result.accuracy * 100) | round(1) }}%</td>
+              <td>{{ image.processing_time_seconds | round(2) }}</td>
               {% if image.labels.Production %}
                 <td class="{{ 'ok' if result.matched.get('Production') else 'fail' }}">
                   {{ "ตรง" if result.matched.get('Production') else "ไม่ตรง" }}
