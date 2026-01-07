@@ -71,26 +71,12 @@ def build_doctr_models() -> Iterable[OCRModel]:
             OCRModel(
                 name="Doctr linknet_resnet34",
                 predictor=None,
-                error="ยังไม่ได้ติดตั้งแพ็กเกจ torch ที่รองรับ GPU",
+                error="ยังไม่ได้ติดตั้งแพ็กเกจ torch",
             ),
             OCRModel(
                 name="Doctr fast_base",
                 predictor=None,
-                error="ยังไม่ได้ติดตั้งแพ็กเกจ torch ที่รองรับ GPU",
-            ),
-        ]
-
-    if not torch.cuda.is_available():
-        return [
-            OCRModel(
-                name="Doctr linknet_resnet34",
-                predictor=None,
-                error="ต้องใช้ GPU (CUDA) เท่านั้น กรุณาเปิดใช้งาน CUDA ก่อนใช้งาน Doctr",
-            ),
-            OCRModel(
-                name="Doctr fast_base",
-                predictor=None,
-                error="ต้องใช้ GPU (CUDA) เท่านั้น กรุณาเปิดใช้งาน CUDA ก่อนใช้งาน Doctr",
+                error="ยังไม่ได้ติดตั้งแพ็กเกจ torch",
             ),
         ]
 
@@ -105,14 +91,20 @@ def build_doctr_models() -> Iterable[OCRModel]:
 
 def doctr_predictor(det_arch: str, reco_arch: str) -> Callable[[Image.Image], list[str]]:
     def _predict(image: Image.Image) -> list[str]:
+        import inspect
+
         from doctr.models import ocr_predictor
 
-        predictor = ocr_predictor(
+        predictor_kwargs = dict(
             det_arch=det_arch,
             reco_arch=reco_arch,
             pretrained=True,
-            device="cuda",
         )
+        if "device" in inspect.signature(ocr_predictor).parameters:
+            predictor_kwargs["device"] = "cpu"
+        predictor = ocr_predictor(**predictor_kwargs)
+        if hasattr(predictor, "to"):
+            predictor = predictor.to("cpu")
         np_image = np.array(image)
         result = predictor([np_image])
         return extract_doctr_text(result)
