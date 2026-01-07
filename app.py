@@ -20,7 +20,7 @@ from flask import (
 from PIL import Image, ImageDraw
 from werkzeug.utils import secure_filename
 
-from ocr_models import OCRModel, OCRPrediction, build_models, normalize_text, preprocess_image
+from ocr_models import OCRModel, OCRPrediction, build_models, normalize_text, postprocess_ocr_text, preprocess_image
 
 UPLOAD_DIR = Path("uploads")
 ALLOWED_EXTENSIONS = {".png", ".jpg", ".jpeg", ".bmp", ".tiff"}
@@ -284,7 +284,8 @@ def evaluate_model(
 
     prediction = model.predict(image, preprocess_steps)
     output_text = " ".join(prediction.text)
-    normalized_text = normalize_text(output_text)
+    postprocessed_text = postprocess_ocr_text(output_text)
+    normalized_text = normalize_text(postprocessed_text)
     bbox_image_url = save_bbox_preview(prediction, model.name)
 
     matched: dict[str, bool] = {}
@@ -307,7 +308,7 @@ def evaluate_model(
         "available": True,
         "accuracy": accuracy,
         "matched": matched,
-        "output": output_text,
+        "output": postprocessed_text,
         "bbox_image_url": bbox_image_url,
         "correct": correct,
         "total": total,
