@@ -121,14 +121,18 @@ def paddleocr_predictor(
         effective_use_gpu = use_gpu or use_tensorrt
         key = (ocr_version, use_tensorrt, effective_use_gpu, precision)
         if key not in _PADDLE_OCR_CACHE:
-            _PADDLE_OCR_CACHE[key] = PaddleOCR(
-                use_angle_cls=True,
-                lang="en",
-                ocr_version=ocr_version,
-                use_tensorrt=use_tensorrt,
-                precision=precision,
-                use_gpu=effective_use_gpu,
-            )
+            init_params = getattr(PaddleOCR.__init__, "__code__", None)
+            init_args = set(init_params.co_varnames) if init_params else set()
+            kwargs = {
+                "use_angle_cls": True,
+                "lang": "en",
+                "ocr_version": ocr_version,
+                "use_tensorrt": use_tensorrt,
+                "precision": precision,
+            }
+            if "use_gpu" in init_args:
+                kwargs["use_gpu"] = effective_use_gpu
+            _PADDLE_OCR_CACHE[key] = PaddleOCR(**kwargs)
         engine = _PADDLE_OCR_CACHE[key]
         result = engine.ocr(np.array(image), cls=True)
         if not result:
