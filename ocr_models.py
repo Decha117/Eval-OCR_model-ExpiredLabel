@@ -97,7 +97,6 @@ def doctr_predictor(det_arch: str, reco_arch: str) -> Callable[[Image.Image], li
             det_arch=det_arch,
             reco_arch=reco_arch,
             pretrained=True,
-            device="cpu",
         )
         np_image = np.array(image)
         result = predictor([np_image])
