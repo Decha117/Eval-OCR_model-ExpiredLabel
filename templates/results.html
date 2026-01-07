@@ -41,7 +41,7 @@
         <p class="muted">เวลาประมวลผล: {{ image.processing_time_seconds | round(2) }} วินาที</p>
         {% if image.processed_image_url %}
           <div class="image-preview">
-            <span class="muted">ภาพหลังการ preprocess + text detection</span>
+            <span class="muted">ภาพหลังการ preprocess</span>
             <img src="{{ image.processed_image_url }}" alt="ภาพหลังประมวลผล {{ image.filename }}" />
           </div>
         {% elif image.image_url %}
@@ -58,6 +58,7 @@
               <th>Time</th>
               <th>Expiry</th>
               <th>Code</th>
+              <th>ภาพ OCR</th>
               <th>Output</th>
               <th>สถานะ</th>
             </tr>
@@ -95,6 +96,13 @@
               {% else %}
                 <td class="muted">ไม่ระบุ</td>
               {% endif %}
+              <td class="ocr-bbox">
+                {% if result.bbox_image_url %}
+                  <img src="{{ result.bbox_image_url }}" alt="ผลลัพธ์ OCR ของ {{ result.name }}" />
+                {% else %}
+                  <span class="muted">ไม่มี bbox</span>
+                {% endif %}
+              </td>
               <td>
                 {% if result.output %}
                   <pre class="ocr-output">{{ result.output }}</pre>

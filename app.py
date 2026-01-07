@@ -17,10 +17,10 @@ from flask import (
     stream_with_context,
     url_for,
 )
-from PIL import Image
+from PIL import Image, ImageDraw
 from werkzeug.utils import secure_filename
 
-from ocr_models import OCRModel, build_models, normalize_text, preprocess_image
+from ocr_models import OCRModel, OCRPrediction, build_models, normalize_text, preprocess_image
 
 UPLOAD_DIR = Path("uploads")
 ALLOWED_EXTENSIONS = {".png", ".jpg", ".jpeg", ".bmp", ".tiff"}
@@ -255,14 +255,16 @@ def evaluate_model(
             "accuracy": 0.0,
             "matched": {},
             "output": "",
+            "bbox_image_url": None,
             "correct": 0,
             "total": 0,
             "reason": model.error,
         }
 
-    extracted_text = model.predict(image)
-    output_text = " ".join(extracted_text)
+    prediction = model.predict(image)
+    output_text = " ".join(prediction.text)
     normalized_text = normalize_text(output_text)
+    bbox_image_url = save_bbox_preview(prediction, model.name)
 
     matched: dict[str, bool] = {}
     correct = 0
@@ -285,6 +287,7 @@ def evaluate_model(
         "accuracy": accuracy,
         "matched": matched,
         "output": output_text,
+        "bbox_image_url": bbox_image_url,
         "correct": correct,
         "total": total,
         "reason": None,
@@ -300,6 +303,20 @@ def save_processed_preview(image: Image.Image) -> str:
     filename = f"processed_{uuid.uuid4().hex}.jpg"
     image_path = UPLOAD_DIR / filename
     processed.save(image_path, format="JPEG", quality=90)
+    return f"/uploads/{image_path.name}"
+
+
+def save_bbox_preview(prediction: OCRPrediction, model_name: str) -> str | None:
+    if not prediction.boxes:
+        return None
+    preview = prediction.image.copy()
+    draw = ImageDraw.Draw(preview)
+    for box in prediction.boxes:
+        draw.rectangle(box, outline="#ef4444", width=2)
+    safe_name = "".join(char if char.isalnum() else "_" for char in model_name).strip("_")
+    filename = f"bbox_{safe_name}_{uuid.uuid4().hex}.jpg"
+    image_path = UPLOAD_DIR / filename
+    preview.save(image_path, format="JPEG", quality=90)
     return f"/uploads/{image_path.name}"
 
 

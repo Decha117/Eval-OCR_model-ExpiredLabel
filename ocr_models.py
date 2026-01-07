@@ -34,15 +34,22 @@ def preprocess_image(image: Image.Image) -> Image.Image:
 
 
 @dataclass
+class OCRPrediction:
+    text: list[str]
+    boxes: list[tuple[int, int, int, int]]
+    image: Image.Image
+
+
+@dataclass
 class OCRModel:
     name: str
-    predictor: Callable[[Image.Image], list[str]] | None
+    predictor: Callable[[Image.Image], OCRPrediction] | None
     error: str | None = None
 
-    def predict(self, image: Image.Image) -> list[str]:
-        if not self.predictor:
-            return []
+    def predict(self, image: Image.Image) -> OCRPrediction:
         preprocessed = preprocess_image(image)
+        if not self.predictor:
+            return OCRPrediction(text=[], boxes=[], image=preprocessed)
         return self.predictor(preprocessed)
 
 
@@ -89,8 +96,8 @@ def build_doctr_models() -> Iterable[OCRModel]:
     ]
 
 
-def doctr_predictor(det_arch: str, reco_arch: str) -> Callable[[Image.Image], list[str]]:
-    def _predict(image: Image.Image) -> list[str]:
+def doctr_predictor(det_arch: str, reco_arch: str) -> Callable[[Image.Image], OCRPrediction]:
+    def _predict(image: Image.Image) -> OCRPrediction:
         from doctr.models import ocr_predictor
 
         predictor = ocr_predictor(
@@ -100,19 +107,31 @@ def doctr_predictor(det_arch: str, reco_arch: str) -> Callable[[Image.Image], li
         )
         np_image = np.array(image)
         result = predictor([np_image])
-        return extract_doctr_text(result)
+        height, width = np_image.shape[:2]
+        text, boxes = extract_doctr_prediction(result, width, height)
+        return OCRPrediction(text=text, boxes=boxes, image=image)
 
     return _predict
 
 
-def extract_doctr_text(result) -> list[str]:
+def extract_doctr_prediction(result, width: int, height: int) -> tuple[list[str], list[tuple[int, int, int, int]]]:
     words: list[str] = []
+    boxes: list[tuple[int, int, int, int]] = []
     export = result.export()
     for page in export.get("pages", []):
         for block in page.get("blocks", []):
             for line in block.get("lines", []):
                 for word in line.get("words", []):
                     value = word.get("value")
+                    geometry = word.get("geometry")
                     if value:
                         words.append(value)
-    return words
+                    if geometry and len(geometry) == 2:
+                        (x_min, y_min), (x_max, y_max) = geometry
+                        x1 = max(0, min(int(x_min * width), width - 1))
+                        y1 = max(0, min(int(y_min * height), height - 1))
+                        x2 = max(0, min(int(x_max * width), width - 1))
+                        y2 = max(0, min(int(y_max * height), height - 1))
+                        if x2 > x1 and y2 > y1:
+                            boxes.append((x1, y1, x2, y2))
+    return words, boxes
