@@ -2,50 +2,18 @@ from __future__ import annotations
 
 import importlib.util
 from dataclasses import dataclass
-import re
 from typing import Callable, Iterable
 
 import cv2
 import numpy as np
 from PIL import Image
 
+
 def normalize_text(text: str) -> str:
     return " ".join(text.lower().split())
 
 
 PREPROCESSING_STEPS = ("crop_bottom_half", "rotate_minus_3", "clahe")
-CODE_PREFIX_MAP = {
-    "-": "B",
-    "_": "B",
-    "8": "B",
-    "0": "O",
-    "1": "I",
-    "2": "Z",
-    "5": "S",
-    "6": "G",
-    "7": "T",
-    "9": "G",
-}
-
-
-def postprocess_ocr_text(text: str) -> str:
-    if not text:
-        return text
-
-    def normalize_code(match: re.Match[str]) -> str:
-        prefix = match.group(1)
-        digits = match.group(2)
-        if prefix.isalpha():
-            normalized_prefix = prefix.upper()
-        else:
-            normalized_prefix = CODE_PREFIX_MAP.get(prefix)
-            if not normalized_prefix:
-                return match.group(0)
-        return f"{normalized_prefix} {digits}"
-
-    normalized = re.sub(r"\b(\d{1,2})\s*:\s*(\d{2})\b", r"\1:\2", text)
-    normalized = re.sub(r"\b([A-Za-z0-9\-_])\s*([0-9]{2})\b", normalize_code, normalized)
-    return normalized
 
 
 def preprocess_image(image: Image.Image, steps: Iterable[str] | None = None) -> Image.Image:
