@@ -284,7 +284,7 @@ def evaluate_model(
 
     prediction = model.predict(image, preprocess_steps)
     output_text = " ".join(prediction.text)
-    postprocessed_text = postprocess_ocr_text(output_text, labels.get("Production"))
+    postprocessed_text = postprocess_ocr_text(output_text)
     normalized_text = normalize_text(postprocessed_text)
     bbox_image_url = save_bbox_preview(prediction, model.name)
 

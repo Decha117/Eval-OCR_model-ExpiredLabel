@@ -26,12 +26,9 @@ CODE_PREFIX_MAP = {
     "7": "T",
     "9": "G",
 }
-ALPHA_PREFIX_MAP = {
-    "U": "B",
-}
 
 
-def postprocess_ocr_text(text: str, production_text: str | None = None) -> str:
+def postprocess_ocr_text(text: str) -> str:
     if not text:
         return text
 
@@ -39,39 +36,15 @@ def postprocess_ocr_text(text: str, production_text: str | None = None) -> str:
         prefix = match.group(1)
         digits = match.group(2)
         if prefix.isalpha():
-            normalized_prefix = ALPHA_PREFIX_MAP.get(prefix.upper(), prefix.upper())
+            normalized_prefix = prefix.upper()
         else:
             normalized_prefix = CODE_PREFIX_MAP.get(prefix)
             if not normalized_prefix:
                 return match.group(0)
-        return f"{normalized_prefix} {digits.zfill(2)}"
-
-    def extract_production_month_year(value: str | None) -> tuple[str, str] | None:
-        if not value:
-            return None
-        date_match = re.search(r"\b(\d{2})[/-](\d{2})[/-](\d{2,4})\b", value)
-        if date_match:
-            _, month, year = date_match.groups()
-            return month, year[-2:]
-        short_match = re.search(r"\b(\d{2})[/-](\d{2,4})\b", value)
-        if short_match:
-            month, year = short_match.groups()
-            return month, year[-2:]
-        return None
-
-    production_month_year = extract_production_month_year(production_text)
-
-    def normalize_expiry(match: re.Match[str]) -> str:
-        day, month, year_digit = match.groups()
-        if production_month_year and month == production_month_year[0]:
-            year = production_month_year[1]
-        else:
-            year = year_digit.zfill(2)
-        return f"{day}/{month}/{year}"
+        return f"{normalized_prefix} {digits}"
 
     normalized = re.sub(r"\b(\d{1,2})\s*:\s*(\d{2})\b", r"\1:\2", text)
-    normalized = re.sub(r"\b([A-Za-z0-9\-_])\s*([0-9]{1,2})\b", normalize_code, normalized)
-    normalized = re.sub(r"\b(\d{2})[/-](\d{2})[/-](\d)\b", normalize_expiry, normalized)
+    normalized = re.sub(r"\b([A-Za-z0-9\-_])\s*([0-9]{2})\b", normalize_code, normalized)
     return normalized
 
 
