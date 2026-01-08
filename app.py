@@ -20,7 +20,8 @@ from flask import (
 from PIL import Image, ImageDraw
 from werkzeug.utils import secure_filename
 
-from ocr_models import OCRModel, OCRPrediction, build_models, normalize_text, postprocess_ocr_text, preprocess_image
+from ocr_models import OCRModel, OCRPrediction, build_models, normalize_text, preprocess_image
+from postprocessing import postprocess_ocr_text
 
 UPLOAD_DIR = Path("uploads")
 ALLOWED_EXTENSIONS = {".png", ".jpg", ".jpeg", ".bmp", ".tiff"}
